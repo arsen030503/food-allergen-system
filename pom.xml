@@ -18,7 +18,14 @@
 		<java.version>21</java.version>
 	</properties>
 
+
 	<dependencies>
+
+		<!-- BCrypt Password Hashing -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-crypto</artifactId>
+		</dependency>
 		<!-- Spring Web -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
