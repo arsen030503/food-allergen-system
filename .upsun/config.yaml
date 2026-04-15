@@ -5,7 +5,7 @@ applications:
     source:
       root: "/" # pom.xml в корне
     type: "java:21"
-    
+
     relationships:
       database: "db:postgresql"
 
@@ -39,7 +39,7 @@ applications:
           index: ["index.html"]
           allow: true
           scripts: false
-          passthrough: "/index.html"
+          passthru: "/index.html"
 
 # 2. Описываем базу данных (PostgreSQL)
 services:
@@ -59,4 +59,3 @@ routes:
   "https://{all}/":
     type: upstream
     upstream: "frontend:http"
-
