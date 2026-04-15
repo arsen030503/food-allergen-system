@@ -5,6 +5,8 @@ applications:
     source:
       root: "/" # pom.xml в корне
     type: "java:21"
+    build:
+      flavor: none
 
     relationships:
       database: "db:postgresql"
