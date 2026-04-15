@@ -1,0 +1,62 @@
+# 1. Описываем приложения
+applications:
+  # Бэкенд (Spring Boot)
+  backend:
+    source:
+      root: "/" # pom.xml в корне
+    type: "java:21"
+    
+    relationships:
+      database: "db:postgresql"
+
+    web:
+      commands:
+        # Запускаем jar, передавая порт от Upsun
+        start: "java -jar target/*.jar --server.port=$PORT"
+
+    mounts:
+      "/.m2": { source: local, source_path: ".m2" }
+
+    hooks:
+      build: |
+        ./mvnw clean install -DskipTests
+
+  # Фронтенд (Vue 3 + Vite)
+  frontend:
+    source:
+      root: "frontend-vue"
+    type: "nodejs:20"
+
+    hooks:
+      build: |
+        npm install
+        npm run build
+
+    web:
+      locations:
+        "/":
+          root: "dist"
+          index: ["index.html"]
+          allow: true
+          scripts: false
+          passthrough: "/index.html"
+
+# 2. Описываем базу данных (PostgreSQL)
+services:
+  db:
+    type: postgresql:15 # Upsun сам назначит порты и логины
+    configuration:
+      schemas: ["postgres"]
+
+# 3. Настраиваем маршруты (самое важное для связи)
+routes:
+  # Запросы на /api уходят на бэкенд
+  "https://{all}/api":
+    type: upstream
+    upstream: "backend:http"
+
+  # Все остальные запросы уходят на фронтенд
+  "https://{all}/":
+    type: upstream
+    upstream: "frontend:http"
+
