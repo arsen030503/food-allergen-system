@@ -44,9 +44,7 @@ applications:
 # 2. Описываем базу данных (PostgreSQL)
 services:
   db:
-    type: postgresql:15 # Upsun сам назначит порты и логины
-    configuration:
-      schemas: ["postgres"]
+    type: postgresql:15
 
 # 3. Настраиваем маршруты (самое важное для связи)
 routes:
