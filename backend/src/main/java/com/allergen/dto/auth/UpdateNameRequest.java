@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public class UpdateNameRequest {
 
-    @NotBlank(message = "Name cannot be empty")
+    @NotBlank(message = "{validation.auth.name.required}")
     private String fullName;
 
     public String getFullName() {

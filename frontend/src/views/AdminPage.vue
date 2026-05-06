@@ -2,24 +2,24 @@
   <div class="admin-page">
     <header class="admin-hero">
       <div>
-        <h1 class="admin-title">Admin</h1>
-        <p class="admin-sub">Manage users, access, and scan history</p>
+        <h1 class="admin-title">{{ t('admin.title') }}</h1>
+        <p class="admin-sub">{{ t('admin.subtitle') }}</p>
       </div>
-      <button type="button" class="btn-refresh" :disabled="loading" @click="fetchUsers">↻ Refresh</button>
+      <button type="button" class="btn-refresh" :disabled="loading" @click="fetchUsers">↻ {{ t('common.refresh') }}</button>
     </header>
 
-    <div v-if="loading" class="state-msg">Loading users…</div>
+    <div v-if="loading" class="state-msg">{{ t('admin.loadingUsers') }}</div>
     <div v-else-if="error" class="state-msg state-err">{{ error }}</div>
 
     <div v-else class="user-table-wrap">
       <table class="user-table">
         <thead>
           <tr>
-            <th>User</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Allergens</th>
-            <th class="th-actions">Actions</th>
+            <th>{{ t('admin.user') }}</th>
+            <th>{{ t('admin.role') }}</th>
+            <th>{{ t('admin.status') }}</th>
+            <th>{{ t('admin.allergens') }}</th>
+            <th class="th-actions">{{ t('admin.actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -48,21 +48,21 @@
               </select>
             </td>
             <td>
-              <span v-if="user.blocked" class="pill pill-bad">Blocked</span>
-              <span v-else class="pill pill-ok">Active</span>
+              <span v-if="user.blocked" class="pill pill-bad">{{ t('admin.blocked') }}</span>
+              <span v-else class="pill pill-ok">{{ t('admin.active') }}</span>
             </td>
-            <td class="td-allergens"><span class="allergen-preview">{{ user.myAllergens || '—' }}</span></td>
+            <td class="td-allergens"><span class="allergen-preview">{{ user.myAllergens || '-' }}</span></td>
             <td class="td-actions">
-              <button type="button" class="btn-mini" @click="openEdit(user)">Edit</button>
-              <button type="button" class="btn-mini" @click="openHistory(user)">History</button>
-              <button type="button" class="btn-mini btn-warn" @click="resetPassword(user)">Reset password</button>
+              <button type="button" class="btn-mini" @click="openEdit(user)">{{ t('admin.edit') }}</button>
+              <button type="button" class="btn-mini" @click="openHistory(user)">{{ t('admin.history') }}</button>
+              <button type="button" class="btn-mini btn-warn" @click="resetPassword(user)">{{ t('admin.resetPassword') }}</button>
               <button
                 v-if="user.role !== 'ADMIN'"
                 type="button"
                 class="btn-mini"
                 @click="toggleBlock(user)"
               >
-                {{ user.blocked ? 'Unblock' : 'Block' }}
+                {{ user.blocked ? t('admin.unblock') : t('admin.block') }}
               </button>
               <button
                 type="button"
@@ -70,7 +70,7 @@
                 :disabled="user.userId === auth.user?.userId"
                 @click="removeUser(user.userId)"
               >
-                Remove
+                {{ t('common.remove') }}
               </button>
             </td>
           </tr>
@@ -82,19 +82,19 @@
     <Teleport to="body">
       <div v-if="editingUser" class="modal-overlay" @click.self="closeEdit">
         <div class="modal panel">
-          <h2>Edit user</h2>
+          <h2>{{ t('admin.editUser') }}</h2>
           <form class="modal-form" @submit.prevent="saveUser">
             <label class="field">
-              <span>Full name</span>
+              <span>{{ t('admin.fullName') }}</span>
               <input v-model="editForm.fullName" type="text" required />
             </label>
             <label class="field">
-              <span>Allergens (CSV)</span>
+              <span>{{ t('admin.allergensCsv') }}</span>
               <textarea v-model="editForm.myAllergens" rows="4"></textarea>
             </label>
             <div class="modal-actions">
-              <button type="button" class="btn-secondary" @click="closeEdit">Cancel</button>
-              <button type="submit" class="btn-primary">Save</button>
+              <button type="button" class="btn-secondary" @click="closeEdit">{{ t('common.cancel') }}</button>
+              <button type="submit" class="btn-primary">{{ t('common.save') }}</button>
             </div>
           </form>
         </div>
@@ -106,22 +106,22 @@
       <div v-if="historyUser" class="modal-overlay" @click.self="closeHistory">
         <div class="modal panel wide">
           <div class="hist-head">
-            <h2>Scan history — {{ historyUser.fullName }}</h2>
+            <h2>{{ t('admin.scanHistory') }} - {{ historyUser.fullName }}</h2>
             <div class="hist-actions">
-              <button type="button" class="btn-secondary btn-sm" @click="clearHist">Clear all</button>
-              <button type="button" class="btn-secondary btn-sm" @click="closeHistory">Close</button>
+              <button type="button" class="btn-secondary btn-sm" @click="clearHist">{{ t('admin.clearAll') }}</button>
+              <button type="button" class="btn-secondary btn-sm" @click="closeHistory">{{ t('common.close') }}</button>
             </div>
           </div>
-          <div v-if="histLoading" class="state-msg">Loading…</div>
+          <div v-if="histLoading" class="state-msg">{{ t('common.loading') }}</div>
           <ul v-else class="hist-list">
             <li v-for="row in histRows" :key="row.id" class="hist-row">
               <div>
-                <strong>{{ row.productName || 'Product' }}</strong>
+                <strong>{{ row.productName || t('admin.product') }}</strong>
                 <div class="hist-ing">{{ row.ingredients }}</div>
               </div>
-              <button type="button" class="btn-mini btn-danger" @click="removeHistRow(row.id)">Delete</button>
+              <button type="button" class="btn-mini btn-danger" @click="removeHistRow(row.id)">{{ t('admin.delete') }}</button>
             </li>
-            <li v-if="!histRows.length" class="state-msg">No scans</li>
+            <li v-if="!histRows.length" class="state-msg">{{ t('admin.noScans') }}</li>
           </ul>
         </div>
       </div>
@@ -131,10 +131,10 @@
     <Teleport to="body">
       <div v-if="resetPlain" class="modal-overlay" @click.self="resetPlain = ''">
         <div class="modal panel">
-          <h2>Temporary password</h2>
-          <p class="hint">Copy now — it won’t be shown again.</p>
+          <h2>{{ t('admin.temporaryPassword') }}</h2>
+          <p class="hint">{{ t('admin.copyNow') }}</p>
           <div class="pwd-box">{{ resetPlain }}</div>
-          <button type="button" class="btn-primary" @click="copyPwd">Copy</button>
+          <button type="button" class="btn-primary" @click="copyPwd">{{ t('common.copy') }}</button>
         </div>
       </div>
     </Teleport>
@@ -144,6 +144,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 import * as authApi from '../api/auth'
@@ -151,6 +152,7 @@ import * as authApi from '../api/auth'
 const auth = useAuthStore()
 const ui = useUiStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const users = ref([])
 const loading = ref(false)
@@ -174,20 +176,20 @@ const fetchUsers = async () => {
   try {
     users.value = await authApi.getAllUsers()
   } catch (err) {
-    error.value = err.response?.data?.message || err.response?.data?.error || 'Failed to load users'
+    error.value = err.response?.data?.message || err.response?.data?.error || t('admin.failedLoadUsers')
   } finally {
     loading.value = false
   }
 }
 
 const removeUser = async (userId) => {
-  if (!confirm('Soft-remove this user? They will not be able to sign in.')) return
+  if (!confirm(t('admin.confirmRemoveUser'))) return
   try {
     await authApi.deleteUser(userId)
-    ui.showToast('User removed')
+    ui.showToast(t('admin.userRemoved'))
     await fetchUsers()
   } catch {
-    ui.showToast('Failed to remove user', 'danger')
+    ui.showToast(t('admin.removeUserFailed'), 'danger')
   }
 }
 
@@ -195,9 +197,9 @@ const changeRole = async (userId, role) => {
   try {
     await authApi.updateUserRole(userId, role)
     await fetchUsers()
-    ui.showToast('Role updated')
+    ui.showToast(t('admin.roleUpdated'))
   } catch {
-    ui.showToast('Failed to update role', 'danger')
+    ui.showToast(t('admin.roleUpdateFailed'), 'danger')
   }
 }
 
@@ -216,29 +218,29 @@ const saveUser = async () => {
     await authApi.updateUserAllergens(editingUser.value.userId, editForm.value.myAllergens)
     await fetchUsers()
     closeEdit()
-    ui.showToast('Saved')
+    ui.showToast(t('admin.saved'))
   } catch {
-    ui.showToast('Save failed', 'danger')
+    ui.showToast(t('admin.saveFailed'), 'danger')
   }
 }
 
 const resetPassword = async (user) => {
-  if (!confirm(`Generate a new password for ${user.email}?`)) return
+  if (!confirm(t('admin.confirmReset', { email: user.email }))) return
   try {
     const res = await authApi.resetUserPassword(user.userId)
     resetPlain.value = res.temporaryPassword
-    ui.showToast('Password reset')
+    ui.showToast(t('admin.passwordReset'))
   } catch (e) {
-    ui.showToast(e.response?.data?.message || e.response?.data?.error || 'Reset failed', 'danger')
+    ui.showToast(e.response?.data?.message || e.response?.data?.error || t('admin.resetFailed'), 'danger')
   }
 }
 
 const copyPwd = async () => {
   try {
     await navigator.clipboard.writeText(resetPlain.value)
-    ui.showToast('Copied')
+    ui.showToast(t('admin.copied'))
   } catch {
-    ui.showToast('Copy failed', 'danger')
+    ui.showToast(t('admin.copyFailed'), 'danger')
   }
 }
 
@@ -246,9 +248,9 @@ const toggleBlock = async (user) => {
   try {
     await authApi.setUserBlocked(user.userId, !user.blocked)
     await fetchUsers()
-    ui.showToast(user.blocked ? 'Unblocked' : 'Blocked')
+    ui.showToast(user.blocked ? t('admin.unblocked') : t('admin.blockedToast'))
   } catch (e) {
-    ui.showToast(e.response?.data?.message || e.response?.data?.error || 'Failed', 'danger')
+    ui.showToast(e.response?.data?.message || e.response?.data?.error || t('admin.failedShort'), 'danger')
   }
 }
 
@@ -259,7 +261,7 @@ const openHistory = async (user) => {
   try {
     histRows.value = await authApi.getUserHistory(user.userId)
   } catch {
-    ui.showToast('Could not load history', 'danger')
+    ui.showToast(t('admin.couldNotLoadHistory'), 'danger')
   } finally {
     histLoading.value = false
   }
@@ -271,24 +273,24 @@ const closeHistory = () => {
 }
 
 const clearHist = async () => {
-  if (!historyUser.value || !confirm('Clear all scans for this user?')) return
+  if (!historyUser.value || !confirm(t('admin.confirmClearHistory'))) return
   try {
     await authApi.clearUserHistory(historyUser.value.userId)
     histRows.value = []
-    ui.showToast('History cleared')
+    ui.showToast(t('admin.historyCleared'))
   } catch {
-    ui.showToast('Failed', 'danger')
+    ui.showToast(t('admin.failedShort'), 'danger')
   }
 }
 
 const removeHistRow = async (id) => {
-  if (!historyUser.value || !confirm('Delete this scan?')) return
+  if (!historyUser.value || !confirm(t('admin.confirmDeleteScan'))) return
   try {
     await authApi.deleteUserHistoryEntry(historyUser.value.userId, id)
     histRows.value = histRows.value.filter((r) => r.id !== id)
-    ui.showToast('Deleted')
+    ui.showToast(t('admin.deleted'))
   } catch {
-    ui.showToast('Failed', 'danger')
+    ui.showToast(t('admin.failedShort'), 'danger')
   }
 }
 

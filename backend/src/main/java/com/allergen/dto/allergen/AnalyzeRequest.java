@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public class AnalyzeRequest {
 
-    @NotBlank(message = "No ingredients provided")
+    @NotBlank(message = "{validation.analyze.ingredients.required}")
     private String ingredients;
 
     private String productName;

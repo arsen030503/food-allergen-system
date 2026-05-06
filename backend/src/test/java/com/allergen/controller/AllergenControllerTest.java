@@ -12,9 +12,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,8 +34,19 @@ class AllergenControllerTest {
     @Mock
     private JwtService jwtService;
 
-    @InjectMocks
     private AllergenController allergenController;
+
+    private static ResourceBundleMessageSource messageSource() {
+        ResourceBundleMessageSource source = new ResourceBundleMessageSource();
+        source.setBasenames("messages");
+        source.setDefaultEncoding("UTF-8");
+        return source;
+    }
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        allergenController = new AllergenController(allergenService, jwtService, messageSource());
+    }
 
     @Test
     void analyzeMapsServicePayloadToTypedResponse() {
@@ -70,7 +83,7 @@ class AllergenControllerTest {
 
     @Test
     void healthReturnsTypedPayload() {
-        ResponseEntity<HealthResponse> response = allergenController.health();
+        ResponseEntity<HealthResponse> response = allergenController.health(Locale.ENGLISH);
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
@@ -83,7 +96,7 @@ class AllergenControllerTest {
         HttpServletRequest servletRequest = org.mockito.Mockito.mock(HttpServletRequest.class);
         when(jwtService.extractUserId(servletRequest)).thenReturn(3L);
 
-        ResponseEntity<MessageResponse> response = allergenController.clearHistory(servletRequest);
+        ResponseEntity<MessageResponse> response = allergenController.clearHistory(servletRequest, Locale.ENGLISH);
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
@@ -96,7 +109,7 @@ class AllergenControllerTest {
         HttpServletRequest servletRequest = org.mockito.Mockito.mock(HttpServletRequest.class);
         when(jwtService.extractUserId(servletRequest)).thenReturn(3L);
 
-        ResponseEntity<MessageResponse> response = allergenController.deleteHistoryEntry(9L, servletRequest);
+        ResponseEntity<MessageResponse> response = allergenController.deleteHistoryEntry(9L, servletRequest, Locale.ENGLISH);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("History entry removed", response.getBody().getMessage());

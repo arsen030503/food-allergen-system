@@ -102,12 +102,12 @@ public class AllergenService {
 
     public Map<String, Object> analyzeIngredients(String ingredientsText, Long userId, String productName) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("error.userId.required");
         }
         User user = userRepository.findByIdAndRemovedAtIsNull(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("error.auth.userNotFound"));
         if (user.getBlockedAt() != null) {
-            throw new ForbiddenException("Account is blocked");
+            throw new ForbiddenException("error.auth.accountBlocked");
         }
         Set<String> profile = parseProfileCsv(user.getMyAllergens());
         boolean userProfileConfigured = !profile.isEmpty();
@@ -173,10 +173,10 @@ public class AllergenService {
 
     public List<ScanHistoryResponse> getHistoryForUser(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("error.userId.required");
         }
         User user = userRepository.findByIdAndRemovedAtIsNull(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("error.auth.userNotFound"));
         Set<String> profile = parseProfileCsv(user.getMyAllergens());
         boolean configured = !profile.isEmpty();
         return scanHistoryRepository.findTop10ByUserIdAndRemovedAtIsNullOrderByScannedAtDesc(userId).stream()
@@ -186,10 +186,10 @@ public class AllergenService {
 
     public ScanStatsResponse getScanStats(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("error.userId.required");
         }
         User user = userRepository.findByIdAndRemovedAtIsNull(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("error.auth.userNotFound"));
         Set<String> profile = parseProfileCsv(user.getMyAllergens());
         boolean configured = !profile.isEmpty();
 
@@ -214,7 +214,7 @@ public class AllergenService {
     @Transactional
     public void clearHistory(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("error.userId.required");
         }
         scanHistoryRepository.softDeleteAllForUser(userId, LocalDateTime.now());
     }
@@ -222,10 +222,10 @@ public class AllergenService {
     @Transactional
     public void softDeleteHistoryEntry(Long userId, Long historyId) {
         if (userId == null || historyId == null) {
-            throw new IllegalArgumentException("userId and historyId are required");
+            throw new IllegalArgumentException("error.userIdHistoryId.required");
         }
         ScanHistory row = scanHistoryRepository.findByIdAndUserIdAndRemovedAtIsNull(historyId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("History entry not found"));
+                .orElseThrow(() -> new IllegalArgumentException("error.history.notFound"));
         row.setRemovedAt(LocalDateTime.now());
         scanHistoryRepository.save(row);
     }

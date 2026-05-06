@@ -23,11 +23,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.*;
 
 @RestController
@@ -38,6 +40,7 @@ public class AuthController {
     private final JwtService jwtService;
     private final AvatarImageService avatarImageService;
     private final UserProfileAssembler userProfileAssembler;
+    private final MessageSource messageSource;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -45,11 +48,13 @@ public class AuthController {
     public AuthController(UserRepository userRepository,
                           JwtService jwtService,
                           AvatarImageService avatarImageService,
-                          UserProfileAssembler userProfileAssembler) {
+                          UserProfileAssembler userProfileAssembler,
+                          MessageSource messageSource) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.avatarImageService = avatarImageService;
         this.userProfileAssembler = userProfileAssembler;
+        this.messageSource = messageSource;
     }
 
     private ResponseEntity<ApiErrorResponse> badRequest(String message) {
@@ -60,29 +65,40 @@ public class AuthController {
         return ResponseEntity.status(status).body(new ApiErrorResponse(message));
     }
 
+    private String m(String key, Locale locale, Object... args) {
+        return messageSource.getMessage(key, args, locale);
+    }
+
+    private String resolveKeyOrText(String raw, Locale locale) {
+        if (raw != null && (raw.startsWith("error.") || raw.startsWith("message."))) {
+            return m(raw, locale);
+        }
+        return raw;
+    }
+
     private User getCurrentUser(HttpServletRequest request) {
         Long userId = jwtService.extractUserId(request);
         return userRepository.findByIdAndRemovedAtIsNull(userId)
-                .orElseThrow(() -> new UnauthorizedException("User not found for token"));
+                .orElseThrow(() -> new UnauthorizedException("error.auth.userNotFoundForToken"));
     }
 
     private User getAuthorizedPathUser(HttpServletRequest request, Long id) {
         User user = getCurrentUser(request);
         if (!user.getId().equals(id)) {
-            throw new UnauthorizedException("Token user does not match requested user");
+            throw new UnauthorizedException("error.auth.tokenUserMismatch");
         }
         return user;
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request, Locale locale) {
         String fullName = request.getFullName().trim();
         String email = request.getEmail();
         String password = request.getPassword();
         String normalizedEmail = email == null ? "" : email.toLowerCase(Locale.ROOT).trim();
 
         if (userRepository.existsByEmailAndRemovedAtIsNull(normalizedEmail)) {
-            return badRequest("Email already registered");
+            return badRequest(m("error.auth.emailRegistered", locale));
         }
 
         User user = new User();
@@ -95,7 +111,7 @@ public class AuthController {
         userRepository.save(user);
 
         AuthRegisterResponse response = new AuthRegisterResponse();
-        response.setMessage("Registration successful");
+        response.setMessage(m("message.auth.registrationSuccess", locale));
         String token = jwtService.generateToken(user);
         response.setUserId(user.getId());
         response.setFullName(user.getFullName());
@@ -107,26 +123,26 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, Locale locale) {
         String email = request.getEmail();
         String password = request.getPassword();
         String normalizedEmail = email == null ? "" : email.toLowerCase(Locale.ROOT).trim();
 
         Optional<User> userOpt = userRepository.findByEmailAndRemovedAtIsNull(normalizedEmail);
         if (userOpt.isEmpty()) {
-            return statusError(401, "Invalid email or password");
+            return statusError(401, m("error.auth.invalidCredentials", locale));
         }
 
         User user = userOpt.get();
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            return statusError(401, "Invalid email or password");
+            return statusError(401, m("error.auth.invalidCredentials", locale));
         }
         if (user.getBlockedAt() != null) {
-            return statusError(403, "Account is blocked");
+            return statusError(403, m("error.auth.accountBlocked", locale));
         }
 
         AuthLoginResponse response = new AuthLoginResponse();
-        response.setMessage("Login successful");
+        response.setMessage(m("message.auth.loginSuccess", locale));
         String token = jwtService.generateToken(user);
         response.setUserId(user.getId());
         response.setFullName(user.getFullName());
@@ -139,24 +155,25 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<MessageResponse> logout() {
+    public ResponseEntity<MessageResponse> logout(Locale locale) {
         return ResponseEntity.ok()
                 .header("Set-Cookie", jwtService.clearAuthCookie().toString())
-                .body(new MessageResponse("Logged out"));
+                .body(new MessageResponse(m("message.auth.loggedOut", locale)));
     }
 
     @PutMapping("/me/password")
     public ResponseEntity<?> changePassword(
             HttpServletRequest httpRequest,
-            @Valid @RequestBody ChangePasswordRequest body
+            @Valid @RequestBody ChangePasswordRequest body,
+            Locale locale
     ) {
         User user = getCurrentUser(httpRequest);
         if (!passwordEncoder.matches(body.getCurrentPassword(), user.getPassword())) {
-            return badRequest("Current password is incorrect");
+            return badRequest(m("error.auth.currentPasswordIncorrect", locale));
         }
         user.setPassword(passwordEncoder.encode(body.getNewPassword()));
         userRepository.save(user);
-        return ResponseEntity.ok(new MessageResponse("Password updated"));
+        return ResponseEntity.ok(new MessageResponse(m("message.auth.passwordUpdated", locale)));
     }
 
     @GetMapping("/me")
@@ -176,7 +193,8 @@ public class AuthController {
     @PutMapping("/me/avatar")
     public ResponseEntity<?> updateAvatar(
             HttpServletRequest httpRequest,
-            @RequestBody UpdateAvatarRequest payload) {
+            @RequestBody UpdateAvatarRequest payload,
+            Locale locale) {
         User user = getCurrentUser(httpRequest);
         String avatarData = payload.getAvatarData();
 
@@ -190,45 +208,48 @@ public class AuthController {
                 user.setAvatarThumb(processed.thumbJpeg());
             }
             userRepository.save(user);
-            return ResponseEntity.ok(new MessageResponse("Avatar updated"));
+            return ResponseEntity.ok(new MessageResponse(m("message.auth.avatarUpdated", locale)));
         } catch (IllegalArgumentException e) {
-            return badRequest(e.getMessage());
+            return badRequest(resolveKeyOrText(e.getMessage(), locale));
         }
     }
 
     @PutMapping("/me/allergens")
     public ResponseEntity<MessageResponse> updateCurrentAllergens(
             HttpServletRequest request,
-            @RequestBody UpdateAllergensRequest payload) {
+            @RequestBody UpdateAllergensRequest payload,
+            Locale locale) {
         User user = getCurrentUser(request);
         String myAllergens = payload.getMyAllergens();
         user.setMyAllergens(myAllergens == null ? "" : myAllergens.trim());
         userRepository.save(user);
-        return ResponseEntity.ok(new MessageResponse("Allergens updated"));
+        return ResponseEntity.ok(new MessageResponse(m("message.auth.allergensUpdated", locale)));
     }
 
     @PutMapping("/user/{id}/allergens")
     public ResponseEntity<MessageResponse> updateAllergens(
             @PathVariable Long id,
             HttpServletRequest request,
-            @RequestBody UpdateAllergensRequest payload) {
+            @RequestBody UpdateAllergensRequest payload,
+            Locale locale) {
         User user = getAuthorizedPathUser(request, id);
         String myAllergens = payload.getMyAllergens();
         user.setMyAllergens(myAllergens == null ? "" : myAllergens.trim());
         userRepository.save(user);
-        return ResponseEntity.ok(new MessageResponse("Allergens updated"));
+        return ResponseEntity.ok(new MessageResponse(m("message.auth.allergensUpdated", locale)));
     }
 
     @PutMapping("/me/name")
     public ResponseEntity<UpdateNameResponse> updateCurrentName(
             HttpServletRequest request,
-            @Valid @RequestBody UpdateNameRequest payload) {
+            @Valid @RequestBody UpdateNameRequest payload,
+            Locale locale) {
         User user = getCurrentUser(request);
         String newName = payload.getFullName().trim();
         user.setFullName(newName);
         userRepository.save(user);
         UpdateNameResponse response = new UpdateNameResponse();
-        response.setMessage("Name updated");
+        response.setMessage(m("message.auth.nameUpdated", locale));
         response.setFullName(user.getFullName());
         return ResponseEntity.ok(response);
     }
@@ -237,13 +258,14 @@ public class AuthController {
     public ResponseEntity<UpdateNameResponse> updateName(
             @PathVariable Long id,
             HttpServletRequest request,
-            @Valid @RequestBody UpdateNameRequest payload) {
+            @Valid @RequestBody UpdateNameRequest payload,
+            Locale locale) {
         User user = getAuthorizedPathUser(request, id);
         String newName = payload.getFullName().trim();
         user.setFullName(newName);
         userRepository.save(user);
         UpdateNameResponse response = new UpdateNameResponse();
-        response.setMessage("Name updated");
+        response.setMessage(m("message.auth.nameUpdated", locale));
         response.setFullName(user.getFullName());
         return ResponseEntity.ok(response);
     }

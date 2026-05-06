@@ -21,12 +21,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @RestController
@@ -38,6 +40,7 @@ public class AdminController {
     private final UserProfileAssembler userProfileAssembler;
     private final AllergenService allergenService;
     private final SecurePasswordGenerator passwordGenerator;
+    private final MessageSource messageSource;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -46,24 +49,30 @@ public class AdminController {
                            JwtService jwtService,
                            UserProfileAssembler userProfileAssembler,
                            AllergenService allergenService,
-                           SecurePasswordGenerator passwordGenerator) {
+                           SecurePasswordGenerator passwordGenerator,
+                           MessageSource messageSource) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.userProfileAssembler = userProfileAssembler;
         this.allergenService = allergenService;
         this.passwordGenerator = passwordGenerator;
+        this.messageSource = messageSource;
+    }
+
+    private String m(String key, Locale locale) {
+        return messageSource.getMessage(key, null, locale);
     }
 
     private void checkAdmin(HttpServletRequest request) {
         String role = jwtService.extractRole(request);
         if (!"ADMIN".equals(role)) {
-            throw new UnauthorizedException("Admin access required");
+            throw new UnauthorizedException("error.auth.adminRequired");
         }
     }
 
     private User requireActiveUser(Long id) {
         return userRepository.findByIdAndRemovedAtIsNull(id)
-                .orElseThrow(() -> new UnauthorizedException("User not found"));
+                .orElseThrow(() -> new UnauthorizedException("error.auth.userNotFound"));
     }
 
     @GetMapping("/users")
@@ -76,35 +85,37 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{id}")
-    public ResponseEntity<MessageResponse> deleteUser(@PathVariable Long id, HttpServletRequest request) {
+    public ResponseEntity<MessageResponse> deleteUser(@PathVariable Long id, HttpServletRequest request, Locale locale) {
         checkAdmin(request);
         User user = requireActiveUser(id);
         user.setRemovedAt(LocalDateTime.now());
         userRepository.save(user);
-        return ResponseEntity.ok(new MessageResponse("User removed"));
+        return ResponseEntity.ok(new MessageResponse(m("message.admin.userRemoved", locale)));
     }
 
     @PutMapping("/users/{id}/reset-password")
     public ResponseEntity<ResetPasswordResponse> resetUserPassword(
             @PathVariable Long id,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            Locale locale) {
         checkAdmin(request);
         User user = requireActiveUser(id);
         String plain = passwordGenerator.generateStrong(12);
         user.setPassword(passwordEncoder.encode(plain));
         userRepository.save(user);
-        return ResponseEntity.ok(new ResetPasswordResponse("Password reset. Copy the temporary password now.", plain));
+        return ResponseEntity.ok(new ResetPasswordResponse(m("message.admin.passwordReset", locale), plain));
     }
 
     @PutMapping("/users/{id}/blocked")
     public ResponseEntity<MessageResponse> setUserBlocked(
             @PathVariable Long id,
             HttpServletRequest request,
-            @RequestBody UserBlockRequest body) {
+            @RequestBody UserBlockRequest body,
+            Locale locale) {
         checkAdmin(request);
         User user = requireActiveUser(id);
         if (user.getRole() == Role.ADMIN) {
-            throw new ForbiddenException("Cannot block an administrator");
+            throw new ForbiddenException("error.auth.cannotBlockAdmin");
         }
         if (body.isBlocked()) {
             user.setBlockedAt(LocalDateTime.now());
@@ -112,7 +123,9 @@ public class AdminController {
             user.setBlockedAt(null);
         }
         userRepository.save(user);
-        return ResponseEntity.ok(new MessageResponse(body.isBlocked() ? "User blocked" : "User unblocked"));
+        return ResponseEntity.ok(new MessageResponse(body.isBlocked()
+                ? m("message.admin.userBlocked", locale)
+                : m("message.admin.userUnblocked", locale)));
     }
 
     @GetMapping("/users/{id}/history")
@@ -127,49 +140,53 @@ public class AdminController {
     @DeleteMapping("/users/{id}/history")
     public ResponseEntity<MessageResponse> clearUserHistory(
             @PathVariable Long id,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            Locale locale) {
         checkAdmin(request);
         requireActiveUser(id);
         allergenService.clearHistory(id);
-        return ResponseEntity.ok(new MessageResponse("User history cleared"));
+        return ResponseEntity.ok(new MessageResponse(m("message.admin.userHistoryCleared", locale)));
     }
 
     @DeleteMapping("/users/{userId}/history/{historyId}")
     public ResponseEntity<MessageResponse> deleteUserHistoryEntry(
             @PathVariable Long userId,
             @PathVariable Long historyId,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            Locale locale) {
         checkAdmin(request);
         requireActiveUser(userId);
         allergenService.softDeleteHistoryEntry(userId, historyId);
-        return ResponseEntity.ok(new MessageResponse("History entry removed"));
+        return ResponseEntity.ok(new MessageResponse(m("message.history.entryRemoved", locale)));
     }
 
     @PutMapping("/users/{id}/allergens")
     public ResponseEntity<MessageResponse> updateUserAllergens(
             @PathVariable Long id,
             HttpServletRequest request,
-            @RequestBody UpdateAllergensRequest payload) {
+            @RequestBody UpdateAllergensRequest payload,
+            Locale locale) {
         checkAdmin(request);
         User user = requireActiveUser(id);
         String myAllergens = payload.getMyAllergens();
         user.setMyAllergens(myAllergens == null ? "" : myAllergens.trim());
         userRepository.save(user);
-        return ResponseEntity.ok(new MessageResponse("Allergens updated"));
+        return ResponseEntity.ok(new MessageResponse(m("message.auth.allergensUpdated", locale)));
     }
 
     @PutMapping("/users/{id}/name")
     public ResponseEntity<UpdateNameResponse> updateUserName(
             @PathVariable Long id,
             HttpServletRequest request,
-            @Valid @RequestBody UpdateNameRequest payload) {
+            @Valid @RequestBody UpdateNameRequest payload,
+            Locale locale) {
         checkAdmin(request);
         User user = requireActiveUser(id);
         String newName = payload.getFullName().trim();
         user.setFullName(newName);
         userRepository.save(user);
         UpdateNameResponse response = new UpdateNameResponse();
-        response.setMessage("Name updated");
+        response.setMessage(m("message.auth.nameUpdated", locale));
         response.setFullName(user.getFullName());
         return ResponseEntity.ok(response);
     }
@@ -178,16 +195,17 @@ public class AdminController {
     public ResponseEntity<MessageResponse> updateUserRole(
             @PathVariable Long id,
             HttpServletRequest request,
-            @RequestBody RoleUpdateRequest payload) {
+            @RequestBody RoleUpdateRequest payload,
+            Locale locale) {
         checkAdmin(request);
         User user = requireActiveUser(id);
         try {
             Role role = Role.valueOf(payload.getRole().toUpperCase());
             user.setRole(role);
             userRepository.save(user);
-            return ResponseEntity.ok(new MessageResponse("Role updated"));
+            return ResponseEntity.ok(new MessageResponse(m("message.admin.roleUpdated", locale)));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Invalid role"));
+            return ResponseEntity.badRequest().body(new MessageResponse(m("error.role.invalid", locale)));
         }
     }
 

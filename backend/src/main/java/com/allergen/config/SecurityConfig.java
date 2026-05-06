@@ -4,6 +4,7 @@ import com.allergen.dto.common.ApiErrorResponse;
 import com.allergen.security.AccountStatusFilter;
 import com.allergen.security.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.context.MessageSource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Configuration
@@ -30,13 +32,20 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AccountStatusFilter accountStatusFilter;
     private final ObjectMapper objectMapper;
+    private final MessageSource messageSource;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           AccountStatusFilter accountStatusFilter,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          MessageSource messageSource) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.accountStatusFilter = accountStatusFilter;
         this.objectMapper = objectMapper;
+        this.messageSource = messageSource;
+    }
+
+    private String m(String key, Locale locale) {
+        return messageSource.getMessage(key, null, locale);
     }
 
     @Bean
@@ -64,12 +73,18 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(401);
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(response.getOutputStream(), new ApiErrorResponse("Unauthorized"));
+                            objectMapper.writeValue(
+                                    response.getOutputStream(),
+                                    new ApiErrorResponse(m("error.unauthorized", request.getLocale()))
+                            );
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             response.setStatus(403);
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(response.getOutputStream(), new ApiErrorResponse("Forbidden"));
+                            objectMapper.writeValue(
+                                    response.getOutputStream(),
+                                    new ApiErrorResponse(m("error.forbidden", request.getLocale()))
+                            );
                         })
                 );
 
@@ -78,7 +93,7 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
-            @Value("${app.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080}") String allowedOrigins
+            @Value("${app.cors.allowed-origins:http://localhost,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://164.92.177.64,https://164.92.177.64}") String allowedOrigins
     ) {
         CorsConfiguration config = new CorsConfiguration();
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
@@ -87,9 +102,12 @@ public class SecurityConfig {
                 .collect(Collectors.toList());
         if (origins.isEmpty()) {
             origins = List.of(
+                    "http://localhost",
                     "http://localhost:5173",
                     "http://127.0.0.1:5173",
-                    "http://localhost:8080"
+                    "http://localhost:8080",
+                    "http://164.92.177.64",
+                    "https://164.92.177.64"
             );
         }
         config.setAllowedOriginPatterns(origins);

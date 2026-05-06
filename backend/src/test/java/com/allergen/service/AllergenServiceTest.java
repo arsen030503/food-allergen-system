@@ -137,7 +137,7 @@ class AllergenServiceTest {
     @Test
     void getHistoryRequiresUserId() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> allergenService.getHistoryForUser(null));
-        assertEquals("userId is required", ex.getMessage());
+        assertEquals("error.userId.required", ex.getMessage());
     }
 
     @Test

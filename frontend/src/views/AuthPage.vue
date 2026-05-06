@@ -1,10 +1,12 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const activeTab = ref('login')
 
@@ -33,7 +35,7 @@ function switchTab(tab) {
 async function submitLogin() {
   localError.value = ''
   if (!loginForm.value.email || !loginForm.value.password) {
-    localError.value = 'Please fill in all fields'
+    localError.value = t('auth.fillAll')
     return
   }
 
@@ -56,11 +58,11 @@ async function submitRegister() {
   }
 
   if (!payload.firstName || !payload.email || !payload.password) {
-    localError.value = 'Please fill in all fields'
+    localError.value = t('auth.fillAll')
     return
   }
   if (payload.password.length < 6) {
-    localError.value = 'Password must be at least 6 characters'
+    localError.value = t('auth.minPassword')
     return
   }
 
@@ -84,26 +86,26 @@ async function submitRegister() {
           <div class="auth-brand-name">AllerScan</div>
         </div>
         <div style="margin-top: 40px">
-          <div class="auth-hero-title">Stay safe,<br />eat <em>smart</em></div>
+          <div class="auth-hero-title">{{ t('auth.staySafe') }}<br />{{ t('auth.eatSmart') }}</div>
           <div class="auth-hero-sub">
-            Detect food allergens instantly. Personalized alerts for your allergies.
+            {{ t('auth.heroSub') }}
           </div>
           <div class="auth-features">
             <div class="auth-feature">
               <div class="auth-feature-icon"><svg viewBox="0 0 24 24"><use href="#ic-shield"/></svg></div>
-              EU 14 major allergens covered
+              {{ t('auth.euCovered') }}
             </div>
             <div class="auth-feature">
               <div class="auth-feature-icon"><svg viewBox="0 0 24 24"><use href="#ic-shield"/></svg></div>
-              FDA 9 major allergens covered
+              {{ t('auth.fdaCovered') }}
             </div>
             <div class="auth-feature">
               <div class="auth-feature-icon"><svg viewBox="0 0 24 24"><use href="#ic-scan"/></svg></div>
-              Instant ingredient analysis
+              {{ t('auth.instantAnalysis') }}
             </div>
             <div class="auth-feature">
               <div class="auth-feature-icon"><svg viewBox="0 0 24 24"><use href="#ic-profile"/></svg></div>
-              Personal allergen profile
+              {{ t('auth.personalProfile') }}
             </div>
           </div>
         </div>
@@ -115,59 +117,59 @@ async function submitRegister() {
       <div class="auth-right">
         <div class="auth-tabs">
           <button class="auth-tab" :class="{ active: activeTab === 'login' }" @click="switchTab('login')">
-            Sign In
+            {{ t('auth.signIn') }}
           </button>
           <button class="auth-tab" :class="{ active: activeTab === 'register' }" @click="switchTab('register')">
-            Create Account
+            {{ t('auth.createAccount') }}
           </button>
         </div>
 
         <div class="auth-error" :class="{ show: errorMessage }">{{ errorMessage }}</div>
 
         <form v-if="activeTab === 'login'" class="auth-form active" @submit.prevent="submitLogin">
-          <div class="auth-form-title">Welcome back</div>
-          <div class="auth-form-sub">Sign in to your AllerScan account</div>
+          <div class="auth-form-title">{{ t('auth.welcomeBack') }}</div>
+          <div class="auth-form-sub">{{ t('auth.signInSub') }}</div>
 
           <div class="auth-input-group">
-            <label class="auth-input-label">Email Address</label>
+            <label class="auth-input-label">{{ t('auth.emailAddress') }}</label>
             <input v-model="loginForm.email" type="email" class="auth-input" placeholder="your@email.com" />
           </div>
 
           <div class="auth-input-group">
-            <label class="auth-input-label">Password</label>
-            <input v-model="loginForm.password" type="password" class="auth-input" placeholder="Enter your password" />
+            <label class="auth-input-label">{{ t('auth.password') }}</label>
+            <input v-model="loginForm.password" type="password" class="auth-input" :placeholder="t('auth.enterPassword')" />
           </div>
 
-          <button class="auth-submit" :disabled="isLoading">{{ isLoading ? 'Signing in...' : 'Sign In' }}</button>
+          <button class="auth-submit" :disabled="isLoading">{{ isLoading ? t('auth.signInProgress') : t('auth.signIn') }}</button>
         </form>
 
         <form v-else class="auth-form active" @submit.prevent="submitRegister">
-          <div class="auth-form-title">Create account</div>
-          <div class="auth-form-sub">Join AllerScan - it's free!</div>
+          <div class="auth-form-title">{{ t('auth.createAccountTitle') }}</div>
+          <div class="auth-form-sub">{{ t('auth.createAccountSub') }}</div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
             <div class="auth-input-group">
-              <label class="auth-input-label">First Name</label>
-              <input v-model="registerForm.firstName" type="text" class="auth-input" placeholder="First name" />
+              <label class="auth-input-label">{{ t('auth.firstName') }}</label>
+              <input v-model="registerForm.firstName" type="text" class="auth-input" :placeholder="t('auth.firstNamePlaceholder')" />
             </div>
             <div class="auth-input-group">
-              <label class="auth-input-label">Last Name</label>
-              <input v-model="registerForm.lastName" type="text" class="auth-input" placeholder="Last name" />
+              <label class="auth-input-label">{{ t('auth.lastName') }}</label>
+              <input v-model="registerForm.lastName" type="text" class="auth-input" :placeholder="t('auth.lastNamePlaceholder')" />
             </div>
           </div>
 
           <div class="auth-input-group">
-            <label class="auth-input-label">Email Address</label>
+            <label class="auth-input-label">{{ t('auth.emailAddress') }}</label>
             <input v-model="registerForm.email" type="email" class="auth-input" placeholder="your@email.com" />
           </div>
 
           <div class="auth-input-group">
-            <label class="auth-input-label">Password (min 6 characters)</label>
-            <input v-model="registerForm.password" type="password" class="auth-input" placeholder="Create a password" />
+            <label class="auth-input-label">{{ t('auth.passwordMin') }}</label>
+            <input v-model="registerForm.password" type="password" class="auth-input" :placeholder="t('auth.createPassword')" />
           </div>
 
           <button class="auth-submit" :disabled="isLoading">
-            {{ isLoading ? 'Creating account...' : 'Create Account' }}
+            {{ isLoading ? t('auth.createProgress') : t('auth.createAccount') }}
           </button>
         </form>
       </div>

@@ -73,7 +73,7 @@ public class JwtService {
 
         String cookieToken = extractTokenFromCookie(request);
         if (cookieToken == null || cookieToken.isBlank()) {
-            throw new UnauthorizedException("Authorization token is required");
+            throw new UnauthorizedException("error.auth.tokenRequired");
         }
 
         return parseToken(cookieToken);
@@ -87,7 +87,7 @@ public class JwtService {
         } else {
             token = extractTokenFromCookie(request);
             if (token == null || token.isBlank()) {
-                throw new UnauthorizedException("Authorization token is required");
+                throw new UnauthorizedException("error.auth.tokenRequired");
             }
         }
         return parseRole(token);
@@ -157,7 +157,7 @@ public class JwtService {
             Claims claims = Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload();
             return Long.parseLong(claims.getSubject());
         } catch (Exception ex) {
-            throw new UnauthorizedException("Invalid or expired token");
+            throw new UnauthorizedException("error.auth.invalidToken");
         }
     }
 
@@ -166,7 +166,7 @@ public class JwtService {
             Claims claims = Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload();
             return claims.get("role", String.class);
         } catch (Exception ex) {
-            throw new UnauthorizedException("Invalid or expired token");
+            throw new UnauthorizedException("error.auth.invalidToken");
         }
     }
 
@@ -185,10 +185,10 @@ public class JwtService {
 
     private String extractBearerToken(String authorizationHeader) {
         if (authorizationHeader == null || authorizationHeader.isBlank()) {
-            throw new UnauthorizedException("Authorization token is required");
+            throw new UnauthorizedException("error.auth.tokenRequired");
         }
         if (!authorizationHeader.startsWith("Bearer ")) {
-            throw new UnauthorizedException("Authorization header must use Bearer token");
+            throw new UnauthorizedException("error.auth.bearerRequired");
         }
         return authorizationHeader.substring(7).trim();
     }

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useAppStore } from '../stores/app'
 import { useUiStore } from '../stores/ui'
@@ -8,6 +9,7 @@ import * as authApi from '../api/auth'
 const auth = useAuthStore()
 const app = useAppStore()
 const ui = useUiStore()
+const { t } = useI18n()
 
 const editingName = ref(false)
 const fullNameInput = ref(auth.user?.fullName || '')
@@ -23,10 +25,10 @@ const uniqueAllergens = computed(() => {
 
 const memberSince = computed(() => {
   const raw = auth.user?.createdAt
-  if (!raw) return '—'
+  if (!raw) return '-'
   const date = new Date(raw)
   if (Number.isNaN(date.getTime())) return raw
-  return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric', day: 'numeric' })
+  return date.toLocaleDateString(app.locale || undefined, { month: 'long', year: 'numeric', day: 'numeric' })
 })
 
 const pwdCurrent = ref('')
@@ -61,16 +63,16 @@ async function handleProfileAvatarUpload(event) {
   const file = event.target.files?.[0]
   if (!file) return
   if (file.size > 5 * 1024 * 1024) {
-    ui.showToast('Image too large - max 5 MB', 'danger')
+    ui.showToast(t('profile.imageTooLarge'), 'danger')
     event.target.value = ''
     return
   }
   try {
     const dataUrl = await readAsDataUrl(file)
     await app.updateAvatar(dataUrl)
-    ui.showToast('Profile photo updated')
+    ui.showToast(t('profile.photoUpdated'))
   } catch {
-    ui.showToast('Failed to upload avatar', 'danger')
+    ui.showToast(t('profile.avatarUploadFailed'), 'danger')
   } finally {
     event.target.value = ''
   }
@@ -79,25 +81,25 @@ async function handleProfileAvatarUpload(event) {
 async function saveName() {
   const value = fullNameInput.value.trim()
   if (!value) {
-    ui.showToast('Name cannot be empty', 'danger')
+    ui.showToast(t('profile.nameEmpty'), 'danger')
     return
   }
   try {
     await app.updateName(value)
     editingName.value = false
-    ui.showToast('Name updated successfully')
+    ui.showToast(t('profile.nameUpdated'))
   } catch {
-    ui.showToast('Failed to update name', 'danger')
+    ui.showToast(t('profile.updateNameFailed'), 'danger')
   }
 }
 
 async function changePassword() {
   if (pwdNew.value !== pwdNew2.value) {
-    ui.showToast('New passwords do not match', 'danger')
+    ui.showToast(t('profile.passwordsMismatch'), 'danger')
     return
   }
   if (pwdNew.value.length < 8) {
-    ui.showToast('New password must be at least 8 characters', 'danger')
+    ui.showToast(t('profile.minPassword'), 'danger')
     return
   }
   try {
@@ -105,18 +107,18 @@ async function changePassword() {
     pwdCurrent.value = ''
     pwdNew.value = ''
     pwdNew2.value = ''
-    ui.showToast('Password updated')
+    ui.showToast(t('profile.passwordUpdated'))
   } catch (e) {
-    ui.showToast(e.response?.data?.message || e.response?.data?.error || 'Failed', 'danger')
+    ui.showToast(e.response?.data?.message || e.response?.data?.error || t('profile.failed'), 'danger')
   }
 }
 
 async function toggle(name, enabled) {
   try {
     await app.toggleAllergen(name, enabled)
-    ui.showToast(enabled ? `${name} added to your profile` : `${name} removed from profile`)
+    ui.showToast(enabled ? t('profile.allergenAdded', { name }) : t('profile.allergenRemoved', { name }))
   } catch {
-    ui.showToast('Failed to update allergens', 'danger')
+    ui.showToast(t('profile.updateAllergensFailed'), 'danger')
   }
 }
 </script>
@@ -126,15 +128,15 @@ async function toggle(name, enabled) {
     <div class="profile-inner">
       <header class="ph">
         <div>
-          <p class="ph-kicker">Account</p>
-          <h1 class="ph-title">Profile</h1>
-          <p class="ph-desc">Photo, security, and your allergen list — in one place.</p>
+          <p class="ph-kicker">{{ t('profile.account') }}</p>
+          <h1 class="ph-title">{{ t('profile.title') }}</h1>
+          <p class="ph-desc">{{ t('profile.subtitle') }}</p>
         </div>
       </header>
 
       <div class="profile-grid">
         <section class="card card-accent">
-          <h2 class="card-title">Photo & identity</h2>
+          <h2 class="card-title">{{ t('profile.photoIdentity') }}</h2>
           <div class="hero-avatar" @click="triggerProfileAvatarUpload">
             <img v-if="avatarDisplay" :src="avatarDisplay" alt="Profile" />
             <div v-else class="hero-avatar-placeholder">
@@ -144,53 +146,53 @@ async function toggle(name, enabled) {
             </div>
             <div class="hero-avatar-badge">
               <svg width="18" height="18" viewBox="0 0 24 24"><use href="#ic-camera" /></svg>
-              Update
+              {{ t('profile.updatePhoto') }}
             </div>
           </div>
           <input id="profile-avatar-input" type="file" accept="image/*" class="sr-only" @change="handleProfileAvatarUpload" />
 
           <div class="identity-block">
-            <div class="identity-name">{{ auth.user?.fullName || '—' }}</div>
-            <div class="identity-email">{{ auth.user?.email || '—' }}</div>
+            <div class="identity-name">{{ auth.user?.fullName || '-' }}</div>
+            <div class="identity-email">{{ auth.user?.email || '-' }}</div>
             <div class="identity-meta">
-              <span class="meta-pill">Member since {{ memberSince }}</span>
-              <span v-if="auth.user?.role === 'ADMIN'" class="meta-pill meta-admin">Admin</span>
+              <span class="meta-pill">{{ t('profile.memberSince') }} {{ memberSince }}</span>
+              <span v-if="auth.user?.role === 'ADMIN'" class="meta-pill meta-admin">{{ t('profile.admin') }}</span>
             </div>
           </div>
 
           <div class="field-row">
-            <label class="label">Display name</label>
+            <label class="label">{{ t('profile.displayName') }}</label>
             <div class="name-row">
               <input v-model="fullNameInput" class="input" :readonly="!editingName" />
               <template v-if="!editingName">
-                <button type="button" class="btn-soft" @click="startEditName">Edit</button>
+                <button type="button" class="btn-soft" @click="startEditName">{{ t('common.edit') }}</button>
               </template>
               <template v-else>
-                <button type="button" class="btn-primary-inline" @click="saveName">Save</button>
-                <button type="button" class="btn-soft" @click="cancelEditName">Cancel</button>
+                <button type="button" class="btn-primary-inline" @click="saveName">{{ t('common.save') }}</button>
+                <button type="button" class="btn-soft" @click="cancelEditName">{{ t('common.cancel') }}</button>
               </template>
             </div>
           </div>
         </section>
 
         <section class="card">
-          <h2 class="card-title">Security</h2>
-          <p class="card-sub">Change your password any time.</p>
+          <h2 class="card-title">{{ t('profile.security') }}</h2>
+          <p class="card-sub">{{ t('profile.securitySub') }}</p>
           <div class="stack">
-            <label class="label">Current password</label>
+            <label class="label">{{ t('profile.currentPassword') }}</label>
             <input v-model="pwdCurrent" type="password" class="input" autocomplete="current-password" />
-            <label class="label">New password</label>
+            <label class="label">{{ t('profile.newPassword') }}</label>
             <input v-model="pwdNew" type="password" class="input" autocomplete="new-password" />
-            <label class="label">Confirm new password</label>
+            <label class="label">{{ t('profile.confirmNewPassword') }}</label>
             <input v-model="pwdNew2" type="password" class="input" autocomplete="new-password" />
-            <button type="button" class="btn-primary-wide" @click="changePassword">Update password</button>
+            <button type="button" class="btn-primary-wide" @click="changePassword">{{ t('profile.updatePassword') }}</button>
           </div>
         </section>
 
         <section class="card card-wide">
           <div class="card-head">
-            <h2 class="card-title">My allergens</h2>
-            <p class="card-sub">Toggle what applies to you — scans will highlight these matches.</p>
+            <h2 class="card-title">{{ t('profile.myAllergens') }}</h2>
+            <p class="card-sub">{{ t('profile.myAllergensSub') }}</p>
           </div>
           <div class="allergen-grid">
             <div

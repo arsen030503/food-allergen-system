@@ -13,9 +13,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api")
@@ -23,11 +25,17 @@ public class AllergenController {
 
     private final AllergenService allergenService;
     private final JwtService jwtService;
+    private final MessageSource messageSource;
 
     @Autowired
-    public AllergenController(AllergenService allergenService, JwtService jwtService) {
+    public AllergenController(AllergenService allergenService, JwtService jwtService, MessageSource messageSource) {
         this.allergenService = allergenService;
         this.jwtService = jwtService;
+        this.messageSource = messageSource;
+    }
+
+    private String m(String key, Locale locale) {
+        return messageSource.getMessage(key, null, locale);
     }
 
     // POST /api/analyze - analyze ingredients
@@ -76,27 +84,29 @@ public class AllergenController {
 
     @DeleteMapping("/history")
     public ResponseEntity<MessageResponse> clearHistory(
-            HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest,
+            Locale locale) {
         Long userId = jwtService.extractUserId(httpRequest);
         allergenService.clearHistory(userId);
-        return ResponseEntity.ok(new MessageResponse("History cleared"));
+        return ResponseEntity.ok(new MessageResponse(m("message.history.cleared", locale)));
     }
 
     @DeleteMapping("/history/{id}")
     public ResponseEntity<MessageResponse> deleteHistoryEntry(
             @PathVariable Long id,
-            HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest,
+            Locale locale) {
         Long userId = jwtService.extractUserId(httpRequest);
         allergenService.softDeleteHistoryEntry(userId, id);
-        return ResponseEntity.ok(new MessageResponse("History entry removed"));
+        return ResponseEntity.ok(new MessageResponse(m("message.history.entryRemoved", locale)));
     }
 
     // GET /api/health - check if server is running
     @GetMapping("/health")
-    public ResponseEntity<HealthResponse> health() {
+    public ResponseEntity<HealthResponse> health(Locale locale) {
         HealthResponse response = new HealthResponse();
         response.setStatus("running");
-        response.setApp("Food Allergen Detection System");
+        response.setApp(m("message.health.app", locale));
         return ResponseEntity.ok(response);
     }
 }

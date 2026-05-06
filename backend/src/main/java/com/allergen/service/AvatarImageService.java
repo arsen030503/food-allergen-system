@@ -36,20 +36,20 @@ public class AvatarImageService {
             return new ProcessedAvatar(null, null);
         }
         if (avatarPayload.length() > MAX_INPUT_STRING_CHARS) {
-            throw new IllegalArgumentException("Avatar payload is too large");
+            throw new IllegalArgumentException("error.avatar.payloadTooLarge");
         }
         byte[] raw = decodeBase64Payload(avatarPayload.trim());
         if (raw.length > MAX_DECODED_BYTES) {
-            throw new IllegalArgumentException("Avatar image is too large");
+            throw new IllegalArgumentException("error.avatar.imageTooLarge");
         }
         BufferedImage src;
         try {
             src = ImageIO.read(new ByteArrayInputStream(raw));
         } catch (IOException e) {
-            throw new IllegalArgumentException("Invalid image data");
+            throw new IllegalArgumentException("error.avatar.invalidImageData");
         }
         if (src == null) {
-            throw new IllegalArgumentException("Unsupported image format");
+            throw new IllegalArgumentException("error.avatar.unsupportedFormat");
         }
         BufferedImage rgb = toRgb(src);
         byte[] full = encodeJpeg(scaleMax(rgb, FULL_MAX_EDGE), FULL_JPEG_QUALITY);
@@ -62,14 +62,14 @@ public class AvatarImageService {
         if (p.toLowerCase(Locale.ROOT).startsWith("data:")) {
             int comma = p.indexOf(',');
             if (comma < 0) {
-                throw new IllegalArgumentException("Invalid data URL");
+                throw new IllegalArgumentException("error.avatar.invalidDataUrl");
             }
             p = p.substring(comma + 1);
         }
         try {
             return Base64.getDecoder().decode(p);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid base64 image data");
+            throw new IllegalArgumentException("error.avatar.invalidBase64");
         }
     }
 

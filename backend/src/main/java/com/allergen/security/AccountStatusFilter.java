@@ -10,12 +10,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
+import org.springframework.context.MessageSource;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Locale;
 
 /**
  * After JWT authentication, rejects removed/blocked accounts for protected API calls.
@@ -25,10 +27,12 @@ public class AccountStatusFilter extends OncePerRequestFilter {
 
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final MessageSource messageSource;
 
-    public AccountStatusFilter(UserRepository userRepository, ObjectMapper objectMapper) {
+    public AccountStatusFilter(UserRepository userRepository, ObjectMapper objectMapper, MessageSource messageSource) {
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
+        this.messageSource = messageSource;
     }
 
     @Override
@@ -46,12 +50,12 @@ public class AccountStatusFilter extends OncePerRequestFilter {
                     User user = userRepository.findById(userId).orElse(null);
                     if (user == null || user.getRemovedAt() != null) {
                         SecurityContextHolder.clearContext();
-                        sendJson(response, HttpServletResponse.SC_UNAUTHORIZED, "Account not found");
+                        sendJson(response, HttpServletResponse.SC_UNAUTHORIZED, "error.auth.userNotFound", request.getLocale());
                         return;
                     }
                     if (user.getBlockedAt() != null) {
                         SecurityContextHolder.clearContext();
-                        sendJson(response, HttpServletResponse.SC_FORBIDDEN, "Account is blocked");
+                        sendJson(response, HttpServletResponse.SC_FORBIDDEN, "error.auth.accountBlocked", request.getLocale());
                         return;
                     }
                 } catch (NumberFormatException ignored) {
@@ -63,9 +67,12 @@ public class AccountStatusFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private void sendJson(HttpServletResponse response, int status, String message) throws IOException {
+    private void sendJson(HttpServletResponse response, int status, String messageKey, Locale locale) throws IOException {
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        objectMapper.writeValue(response.getOutputStream(), new ApiErrorResponse(message));
+        objectMapper.writeValue(
+                response.getOutputStream(),
+                new ApiErrorResponse(messageSource.getMessage(messageKey, null, locale))
+        );
     }
 }

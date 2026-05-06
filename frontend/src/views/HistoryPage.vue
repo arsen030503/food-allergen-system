@@ -1,17 +1,19 @@
 <script setup>
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from '../stores/app'
 import { useUiStore } from '../stores/ui'
 import { getTimeAgo } from '../utils/time'
 
 const app = useAppStore()
 const ui = useUiStore()
+const { t } = useI18n()
 
 onMounted(async () => {
   try {
     await app.hydrateHistory()
   } catch {
-    ui.showToast('Could not load history', 'danger')
+    ui.showToast(t('history.loadFailed'), 'danger')
   }
 })
 
@@ -24,22 +26,22 @@ function isHistorySafe(item) {
 }
 
 async function clearHistory() {
-  if (!window.confirm('Clear all scan history?')) return
+  if (!window.confirm(t('history.confirmClear'))) return
   try {
     await app.clearHistory()
-    ui.showToast('History cleared')
+    ui.showToast(t('history.cleared'))
   } catch {
-    ui.showToast('Failed to clear history', 'danger')
+    ui.showToast(t('history.clearFailed'), 'danger')
   }
 }
 
 async function removeEntry(item) {
-  if (!window.confirm('Remove this scan from history?')) return
+  if (!window.confirm(t('history.confirmRemove'))) return
   try {
     await app.deleteHistoryEntry(item.id)
-    ui.showToast('Removed')
+    ui.showToast(t('history.removed'))
   } catch {
-    ui.showToast('Failed to remove entry', 'danger')
+    ui.showToast(t('history.removeFailed'), 'danger')
   }
 }
 </script>
@@ -48,10 +50,10 @@ async function removeEntry(item) {
   <div class="history-wrapper">
     <div class="history-page">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <h1 class="page-title">Scan History</h1>
-        <button class="btn btn-outline btn-sm" @click="clearHistory">🗑 Clear All</button>
+        <h1 class="page-title">{{ t('history.title') }}</h1>
+        <button class="btn btn-outline btn-sm" @click="clearHistory">🗑 {{ t('history.clearAll') }}</button>
       </div>
-      <p class="page-sub">Your last 10 ingredient scans</p>
+      <p class="page-sub">{{ t('history.subtitle') }}</p>
 
       <div class="history-grid" v-if="app.scanHistory.length">
         <div v-for="item in app.scanHistory" :key="item.id" class="history-card">
@@ -59,25 +61,25 @@ async function removeEntry(item) {
             <svg viewBox="0 0 24 24"><use :href="isHistorySafe(item) ? '#ic-shield' : '#ic-alert'"/></svg>
           </div>
           <div class="history-info">
-            <div style="font-weight:700;font-size:15px">{{ item.productName || 'Unnamed Product' }}</div>
+            <div style="font-weight:700;font-size:15px">{{ item.productName || t('common.unnamedProduct') }}</div>
             <div class="history-ingredients">{{ item.ingredients }}</div>
-            <div class="history-time">{{ getTimeAgo(item.scannedAt) }}</div>
+            <div class="history-time">{{ getTimeAgo(item.scannedAt, t) }}</div>
           </div>
           <div>
             <div class="history-count" :class="isHistorySafe(item) ? 'safe' : 'danger'">{{ profileMatchCount(item) }}</div>
-            <div style="font-size:10px;font-family:var(--font-mono);color:var(--text-300);text-align:center">allergens</div>
+            <div style="font-size:10px;font-family:var(--font-mono);color:var(--text-300);text-align:center">{{ t('history.allergens') }}</div>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm history-remove" title="Remove" @click.stop="removeEntry(item)">✕</button>
+          <button type="button" class="btn btn-ghost btn-sm history-remove" :title="t('history.removeTitle')" @click.stop="removeEntry(item)">✕</button>
           <span class="badge" :class="isHistorySafe(item) ? 'badge-safe' : profileMatchCount(item) > 2 ? 'badge-danger' : 'badge-warning'">
-            {{ isHistorySafe(item) ? '✓ Safe' : profileMatchCount(item) > 2 ? '⚠ Danger' : '⚡ Caution' }}
+            {{ isHistorySafe(item) ? `✓ ${t('history.safe')}` : profileMatchCount(item) > 2 ? `⚠ ${t('history.danger')}` : `⚡ ${t('history.caution')}` }}
           </span>
         </div>
       </div>
 
       <div v-else class="empty-state">
         <span class="empty-icon">📋</span>
-        <div class="empty-title">No scans yet</div>
-        <p style="font-size:13px;color:var(--text-300)">Your scan history will appear here</p>
+        <div class="empty-title">{{ t('history.noScansTitle') }}</div>
+        <p style="font-size:13px;color:var(--text-300)">{{ t('history.noScansSub') }}</p>
       </div>
     </div>
   </div>

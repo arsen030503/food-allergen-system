@@ -18,10 +18,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 
+import java.util.Locale;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -42,9 +44,17 @@ class AuthControllerTest {
     private AvatarImageService avatarImageService;
 
     private final UserProfileAssembler userProfileAssembler = new UserProfileAssembler();
+    private final ResourceBundleMessageSource messageSource = messageSource();
+
+    private static ResourceBundleMessageSource messageSource() {
+        ResourceBundleMessageSource source = new ResourceBundleMessageSource();
+        source.setBasenames("messages");
+        source.setDefaultEncoding("UTF-8");
+        return source;
+    }
 
     private AuthController controller() {
-        return new AuthController(userRepository, jwtService, avatarImageService, userProfileAssembler);
+        return new AuthController(userRepository, jwtService, avatarImageService, userProfileAssembler, messageSource);
     }
 
     @Test
@@ -67,7 +77,7 @@ class AuthControllerTest {
         request.setEmail(" User@Example.com ");
         request.setPassword("secret123");
 
-        ResponseEntity<?> response = controller.register(request);
+        ResponseEntity<?> response = controller.register(request, Locale.ENGLISH);
 
         assertEquals(HttpStatusCode.valueOf(200), response.getStatusCode());
         AuthRegisterResponse body = assertInstanceOf(AuthRegisterResponse.class, response.getBody());
@@ -93,7 +103,7 @@ class AuthControllerTest {
         when(jwtService.extractUserId(servletRequest)).thenReturn(5L);
 
         UpdateAllergensRequest payload = new UpdateAllergensRequest();
-        ResponseEntity<?> response = controller.updateAllergens(5L, servletRequest, payload);
+        ResponseEntity<?> response = controller.updateAllergens(5L, servletRequest, payload, Locale.ENGLISH);
 
         assertEquals(HttpStatusCode.valueOf(200), response.getStatusCode());
         MessageResponse body = assertInstanceOf(MessageResponse.class, response.getBody());
@@ -121,7 +131,7 @@ class AuthControllerTest {
         UpdateAvatarRequest payload = new UpdateAvatarRequest();
         payload.setAvatarData("data:image/png;base64,abc123");
 
-        ResponseEntity<?> response = controller.updateAvatar(servletRequest, payload);
+        ResponseEntity<?> response = controller.updateAvatar(servletRequest, payload, Locale.ENGLISH);
 
         assertEquals(HttpStatusCode.valueOf(200), response.getStatusCode());
         MessageResponse body = assertInstanceOf(MessageResponse.class, response.getBody());

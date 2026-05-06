@@ -3,6 +3,27 @@ import * as allergenApi from '../api/allergen'
 import * as authApi from '../api/auth'
 import { useAuthStore } from './auth'
 import { getAllergenEmoji, parseUserAllergens, toCsv } from '../utils/allergens'
+import { getStoredLocale, setLocale as applyLocale } from '../i18n'
+
+const THEME_STORAGE_KEY = 'app-theme'
+const SUPPORTED_THEMES = ['light', 'dark']
+
+function normalizeTheme(value) {
+  return SUPPORTED_THEMES.includes(value) ? value : 'light'
+}
+
+function getStoredTheme() {
+  return normalizeTheme(localStorage.getItem(THEME_STORAGE_KEY))
+}
+
+function applyTheme(theme) {
+  const normalized = normalizeTheme(theme)
+  document.documentElement.setAttribute('data-theme', normalized)
+  localStorage.setItem(THEME_STORAGE_KEY, normalized)
+  return normalized
+}
+
+applyTheme(getStoredTheme())
 
 export const useAppStore = defineStore('app', {
   state: () => ({
@@ -14,6 +35,8 @@ export const useAppStore = defineStore('app', {
     analyzing: false,
     analyzeResult: null,
     quickScanDraft: '',
+    locale: getStoredLocale(),
+    theme: getStoredTheme(),
   }),
   getters: {
     filteredAllergens: (state) =>
@@ -57,6 +80,12 @@ export const useAppStore = defineStore('app', {
     },
     setQuickScanDraft(value) {
       this.quickScanDraft = value
+    },
+    setLocale(locale) {
+      this.locale = applyLocale(locale)
+    },
+    setTheme(theme) {
+      this.theme = applyTheme(theme)
     },
     setFilter(value) {
       this.currentFilter = value

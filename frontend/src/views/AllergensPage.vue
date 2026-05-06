@@ -1,9 +1,11 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from '../stores/app'
 
 const app = useAppStore()
 const searchQuery = ref('')
+const { t } = useI18n()
 
 const allergens = computed(() => {
   let filtered = app.filteredAllergens
@@ -31,18 +33,18 @@ function clearSearch() {
     <div class="allergens-page">
       <div class="allergens-header">
         <div>
-          <h1 class="page-title">Allergen Database</h1>
-          <p class="page-sub">EU (14 allergens) + FDA (9 allergens) — Complete reference guide</p>
+          <h1 class="page-title">{{ t('allergens.title') }}</h1>
+          <p class="page-sub">{{ t('allergens.subtitle') }}</p>
         </div>
         <div class="filter-buttons">
-          <button class="btn btn-outline btn-sm" :class="{ 'btn-primary': app.currentFilter === 'ALL' }" @click="setFilter('ALL')">All</button>
-          <button class="btn btn-outline btn-sm" :class="{ 'btn-primary': app.currentFilter === 'EU' }" @click="setFilter('EU')">EU Only</button>
-          <button class="btn btn-outline btn-sm" :class="{ 'btn-primary': app.currentFilter === 'FDA' }" @click="setFilter('FDA')">FDA Only</button>
+          <button class="btn btn-outline btn-sm" :class="{ 'btn-primary': app.currentFilter === 'ALL' }" @click="setFilter('ALL')">{{ t('allergens.all') }}</button>
+          <button class="btn btn-outline btn-sm" :class="{ 'btn-primary': app.currentFilter === 'EU' }" @click="setFilter('EU')">{{ t('allergens.euOnly') }}</button>
+          <button class="btn btn-outline btn-sm" :class="{ 'btn-primary': app.currentFilter === 'FDA' }" @click="setFilter('FDA')">{{ t('allergens.fdaOnly') }}</button>
         </div>
       </div>
 
       <div style="position:relative;margin-bottom:32px">
-        <input v-model="searchQuery" type="text" class="search-input" placeholder="Search allergens by name or ingredients..."/>
+        <input v-model="searchQuery" type="text" class="search-input" :placeholder="t('allergens.searchPlaceholder')"/>
         <button v-if="searchQuery" class="search-clear-btn" @click="clearSearch">✕</button>
       </div>
 
@@ -52,7 +54,7 @@ function clearSearch() {
             <span class="allergen-db-emoji">{{ app.getEmoji(item.name) }}</span>
             <div>
               <div class="allergen-db-name">{{ item.name }}</div>
-              <div class="allergen-db-std">{{ item.standard }} Standard</div>
+              <div class="allergen-db-std">{{ item.standard }} {{ t('allergens.standard') }}</div>
             </div>
           </div>
           <div class="allergen-db-triggers">{{ item.triggerIngredients }}</div>
@@ -65,8 +67,8 @@ function clearSearch() {
 
       <div v-else class="empty-state">
         <span class="empty-icon">🔍</span>
-        <div class="empty-title">No allergens found</div>
-        <p style="font-size:13px;color:var(--text-300)">Try different keywords</p>
+        <div class="empty-title">{{ t('allergens.noFoundTitle') }}</div>
+        <p style="font-size:13px;color:var(--text-300)">{{ t('allergens.noFoundSub') }}</p>
       </div>
     </div>
   </div>

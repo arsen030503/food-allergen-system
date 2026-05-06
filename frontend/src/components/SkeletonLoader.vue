@@ -46,10 +46,10 @@ defineProps({
 }
 
 .skeleton-card {
-  background: #fff;
+  background: var(--card);
   border-radius: 8px;
   padding: 16px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border);
 }
 
 .skeleton-stats {
@@ -59,10 +59,10 @@ defineProps({
 }
 
 .skeleton-stat {
-  background: #fff;
+  background: var(--card);
   border-radius: 8px;
   padding: 16px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border);
   text-align: center;
 }
 
@@ -77,6 +77,14 @@ defineProps({
   height: 88px;
   border-radius: 12px;
   flex-shrink: 0;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 25%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
 }
 
 .skeleton-info {
@@ -84,7 +92,12 @@ defineProps({
 }
 
 .skeleton-line {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 25%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 75%
+  );
   background-size: 200% 100%;
   animation: loading 1.5s infinite;
   border-radius: 4px;

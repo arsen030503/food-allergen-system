@@ -1,30 +1,23 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from '../stores/app'
 import { getTimeAgo } from '../utils/time'
 
 const router = useRouter()
 const app = useAppStore()
+const { t } = useI18n()
 
 const quickIngredients = ref('')
 const recentScans = computed(() => app.scanHistory.slice(0, 4))
 
-const tipsOfDay = [
-  '💡 Always check food labels for "may contain" warnings - they might contain your allergens!',
-  '🔍 EU regulations require 14 major allergens to be clearly labeled on food packaging.',
-  '🧪 Cross-contamination is serious - use separate utensils when handling allergen-free foods.',
-  '📖 Keep an updated list of your allergens with you when shopping or eating out.',
-  '⚠️ Some allergens hide under different names - know the common names for your allergens.',
-  '🏥 Educate friends and family about your allergies for safer social eating.',
-  '📱 Scan products regularly - recipes and ingredients change over time.',
-  '🌍 FDA and EU standards may differ - check which standard your region follows.',
-]
+const tipsOfDay = computed(() => t('dashboard.tips'))
 
 const tipOfDay = computed(() => {
   const today = new Date()
   const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000)
-  return tipsOfDay[dayOfYear % tipsOfDay.length]
+  return tipsOfDay.value[dayOfYear % tipsOfDay.value.length]
 })
 
 async function quickAnalyze() {
@@ -39,17 +32,17 @@ async function quickAnalyze() {
     <div class="dashboard-hero">
       <div class="hero-layout">
         <div class="hero-copy">
-          <p class="hero-greeting">Welcome back 👋</p>
-          <h1 class="hero-title">What are you <em>eating</em><br />today?</h1>
+          <p class="hero-greeting">{{ t('dashboard.greeting') }} 👋</p>
+          <h1 class="hero-title">{{ t('dashboard.titleLine1') }} <em>{{ t('dashboard.titleLine2') }}</em><br />{{ t('dashboard.titleLine3') }}</h1>
           <p class="hero-sub">
-            Scan any product and get instant allergen alerts based on your personal profile.
+            {{ t('dashboard.heroSub') }}
           </p>
         </div>
-        <aside class="hero-cta-card" aria-label="Quick analysis">
-          <div class="hero-cta-label">Quick analysis</div>
-          <div class="hero-cta-title">Scan ingredients right now</div>
+        <aside class="hero-cta-card" :aria-label="t('dashboard.quickAnalysis')">
+          <div class="hero-cta-label">{{ t('dashboard.quickAnalysis') }}</div>
+          <div class="hero-cta-title">{{ t('dashboard.scanNowTitle') }}</div>
           <button type="button" class="btn btn-primary hero-cta-btn" @click="router.push({ name: 'analyze' })">
-            Analyze now →
+            {{ t('dashboard.analyzeNow') }} →
           </button>
         </aside>
       </div>
@@ -59,21 +52,21 @@ async function quickAnalyze() {
       <div class="dashboard-left">
         <div class="quick-scan-box">
           <div class="quick-scan-intro">
-            <h2 class="quick-scan-title">Quick scan</h2>
-            <p class="quick-scan-sub">Paste ingredients for instant analysis</p>
+            <h2 class="quick-scan-title">{{ t('dashboard.quickScan') }}</h2>
+            <p class="quick-scan-sub">{{ t('dashboard.quickScanSub') }}</p>
           </div>
           <textarea
             v-model="quickIngredients"
             class="quick-textarea"
             rows="4"
-            placeholder="e.g. wheat flour, milk, eggs, sugar, butter..."
+            :placeholder="t('dashboard.placeholder')"
           />
           <div class="quick-scan-actions">
-            <button type="button" class="btn btn-primary btn-sm" @click="quickAnalyze">Analyze</button>
+            <button type="button" class="btn btn-primary btn-sm" @click="quickAnalyze">{{ t('dashboard.analyze') }}</button>
           </div>
         </div>
 
-        <div class="section-label">Recent Scans</div>
+        <div class="section-label">{{ t('dashboard.recentScans') }}</div>
 
         <div class="scan-list" v-if="recentScans.length">
           <div v-for="scan in recentScans" :key="scan.id" class="scan-card" @click="router.push({ name: 'history' })">
@@ -81,47 +74,47 @@ async function quickAnalyze() {
               <svg style="stroke:var(--green-600)" viewBox="0 0 24 24"><use href="#ic-history"/></svg>
             </div>
             <div class="scan-info">
-              <div class="scan-name">{{ scan.productName || 'Unnamed Product' }}</div>
-              <div class="scan-meta">{{ getTimeAgo(scan.scannedAt) }}</div>
+              <div class="scan-name">{{ scan.productName || t('common.unnamedProduct') }}</div>
+              <div class="scan-meta">{{ getTimeAgo(scan.scannedAt, t) }}</div>
             </div>
-            <span class="badge badge-safe">View</span>
+            <span class="badge badge-safe">{{ t('dashboard.view') }}</span>
           </div>
         </div>
 
         <div v-else class="empty-state" style="padding:30px 0">
           <span class="empty-icon">📋</span>
-          <div class="empty-title">No scans yet</div>
-          <p style="font-size:13px;color:var(--text-300)">Start scanning ingredients to see results here</p>
+          <div class="empty-title">{{ t('dashboard.noScansTitle') }}</div>
+          <p style="font-size:13px;color:var(--text-300)">{{ t('dashboard.noScansSub') }}</p>
         </div>
       </div>
 
       <div class="dashboard-right">
         <div class="tip-of-day-box">
-          <div class="tip-label">✨ Tip of the Day</div>
+          <div class="tip-label">✨ {{ t('dashboard.tipOfDay') }}</div>
           <div class="tip-content">{{ tipOfDay }}</div>
         </div>
 
-        <div class="section-label" style="margin-top:28px;margin-bottom:20px">Your Stats</div>
+        <div class="section-label" style="margin-top:28px;margin-bottom:20px">{{ t('dashboard.yourStats') }}</div>
         <div class="stats-row">
-          <div class="stat-card"><span class="stat-n danger">{{ app.scanStats.userAllergenCount }}</span><div class="stat-l">My Allergens</div></div>
-          <div class="stat-card"><span class="stat-n">{{ app.totalScans }}</span><div class="stat-l">Total Scans</div></div>
-          <div class="stat-card"><span class="stat-n green">{{ app.safeScans }}</span><div class="stat-l">Safe Products</div></div>
+          <div class="stat-card"><span class="stat-n danger">{{ app.scanStats.userAllergenCount }}</span><div class="stat-l">{{ t('dashboard.myAllergens') }}</div></div>
+          <div class="stat-card"><span class="stat-n">{{ app.totalScans }}</span><div class="stat-l">{{ t('dashboard.totalScans') }}</div></div>
+          <div class="stat-card"><span class="stat-n green">{{ app.safeScans }}</span><div class="stat-l">{{ t('dashboard.safeProducts') }}</div></div>
         </div>
 
         <div style="margin-top:28px">
-          <div class="section-label">My Active Allergens</div>
+          <div class="section-label">{{ t('dashboard.activeAllergens') }}</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
             <span v-for="name in app.userAllergens" :key="name" class="badge badge-danger">{{ app.getEmoji(name) }} {{ name }}</span>
-            <span v-if="!app.userAllergens.length" style="color:var(--text-300);font-size:13px">No allergens selected</span>
+            <span v-if="!app.userAllergens.length" style="color:var(--text-300);font-size:13px">{{ t('dashboard.noAllergensSelected') }}</span>
           </div>
         </div>
 
         <div style="margin-top:28px">
-          <div class="section-label">Quick Actions</div>
+          <div class="section-label">{{ t('dashboard.quickActions') }}</div>
           <div style="display:flex;flex-direction:column;gap:8px">
-            <button class="btn btn-secondary" style="justify-content:center" @click="router.push({ name: 'analyze' })">🔍 New Scan</button>
-            <button class="btn btn-outline" style="justify-content:center" @click="router.push({ name: 'history' })">📋 View History</button>
-            <button class="btn btn-outline" style="justify-content:center" @click="router.push({ name: 'allergens' })">📊 Allergen Database</button>
+            <button class="btn btn-secondary" style="justify-content:center" @click="router.push({ name: 'analyze' })">🔍 {{ t('dashboard.newScan') }}</button>
+            <button class="btn btn-outline" style="justify-content:center" @click="router.push({ name: 'history' })">📋 {{ t('dashboard.viewHistory') }}</button>
+            <button class="btn btn-outline" style="justify-content:center" @click="router.push({ name: 'allergens' })">📊 {{ t('dashboard.allergenDatabase') }}</button>
           </div>
         </div>
       </div>
@@ -245,8 +238,6 @@ async function quickAnalyze() {
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.45;
-  color: var(--green-700);
-  opacity: 0.92;
 }
 
 .quick-scan-actions {
@@ -275,7 +266,7 @@ async function quickAnalyze() {
 
 .dashboard-right {
   background: var(--card);
-  border-left: 1px solid #eee;
+  border-left: 1px solid var(--layout-divider);
   padding: clamp(24px, 3vw, 36px);
   min-width: 0;
 }
@@ -326,7 +317,7 @@ async function quickAnalyze() {
   }
   .dashboard-right {
     border-left: none;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--layout-divider);
   }
 }
 </style>
