@@ -2,9 +2,11 @@ package com.allergen.exception;
 
 import com.allergen.controller.AllergenController;
 import com.allergen.controller.AuthController;
+import com.allergen.dto.auth.UserProfileAssembler;
 import com.allergen.repository.UserRepository;
 import com.allergen.security.JwtService;
 import com.allergen.service.AllergenService;
+import com.allergen.service.AvatarImageService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +37,12 @@ class GlobalExceptionHandlerTest {
         when(jwtService.extractUserId(any(jakarta.servlet.http.HttpServletRequest.class)))
                 .thenThrow(new UnauthorizedException("Authorization token is required"));
 
-        AuthController authController = new AuthController(mock(UserRepository.class), jwtService);
+        AuthController authController = new AuthController(
+                mock(UserRepository.class),
+                jwtService,
+                mock(AvatarImageService.class),
+                new UserProfileAssembler()
+        );
         authMockMvc = MockMvcBuilders
                 .standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler())

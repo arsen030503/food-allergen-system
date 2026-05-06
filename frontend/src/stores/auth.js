@@ -36,7 +36,8 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       this.error = ''
       try {
-        this.user = await authApi.login({ email, password })
+        await authApi.login({ email, password })
+        this.user = await authApi.getMe()
         return this.user
       } catch (error) {
         this.error = this.readError(error, 'Login failed')
@@ -50,7 +51,8 @@ export const useAuthStore = defineStore('auth', {
       this.error = ''
       try {
         const fullName = `${firstName} ${lastName}`.trim()
-        this.user = await authApi.register({ fullName, email, password })
+        await authApi.register({ fullName, email, password })
+        this.user = await authApi.getMe()
         return this.user
       } catch (error) {
         this.error = this.readError(error, 'Registration failed')

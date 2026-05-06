@@ -17,5 +17,7 @@
     <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
     <symbol id="ic-flask" viewBox="0 0 24 24"><path d="M9 3h6M9 3v8l-4 9a1 1 0 00.9 1.5h12.2A1 1 0 0019 20l-4-9V3"/></symbol>
     <symbol id="ic-admin" viewBox="0 0 24 24"><path d="M12 1l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 1z"/></symbol>
+    <symbol id="ic-chevron-left" viewBox="0 0 24 24"><polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="15 18 9 12 15 6"/></symbol>
+    <symbol id="ic-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6L6 18M6 6l12 12"/></symbol>
   </svg>
 </template>

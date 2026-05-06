@@ -2,6 +2,7 @@ package com.allergen.service;
 
 import com.allergen.dto.allergen.ScanHistoryResponse;
 import com.allergen.dto.allergen.ScanStatsResponse;
+import com.allergen.exception.ForbiddenException;
 import com.allergen.model.Allergen;
 import com.allergen.model.ScanHistory;
 import com.allergen.model.User;
@@ -11,7 +12,9 @@ import com.allergen.repository.UserRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.regex.Pattern;
 import java.util.*;
 
@@ -101,8 +104,11 @@ public class AllergenService {
         if (userId == null) {
             throw new IllegalArgumentException("userId is required");
         }
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndRemovedAtIsNull(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (user.getBlockedAt() != null) {
+            throw new ForbiddenException("Account is blocked");
+        }
         Set<String> profile = parseProfileCsv(user.getMyAllergens());
         boolean userProfileConfigured = !profile.isEmpty();
 
@@ -169,11 +175,11 @@ public class AllergenService {
         if (userId == null) {
             throw new IllegalArgumentException("userId is required");
         }
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndRemovedAtIsNull(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         Set<String> profile = parseProfileCsv(user.getMyAllergens());
         boolean configured = !profile.isEmpty();
-        return scanHistoryRepository.findTop10ByUserIdOrderByScannedAtDesc(userId).stream()
+        return scanHistoryRepository.findTop10ByUserIdAndRemovedAtIsNullOrderByScannedAtDesc(userId).stream()
                 .map(row -> toHistoryResponse(row, profile, configured))
                 .toList();
     }
@@ -182,13 +188,13 @@ public class AllergenService {
         if (userId == null) {
             throw new IllegalArgumentException("userId is required");
         }
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndRemovedAtIsNull(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         Set<String> profile = parseProfileCsv(user.getMyAllergens());
         boolean configured = !profile.isEmpty();
 
-        long total = scanHistoryRepository.countByUserId(userId);
-        List<ScanHistory> rows = scanHistoryRepository.findByUserIdOrderByScannedAtDesc(userId);
+        long total = scanHistoryRepository.countByUserIdAndRemovedAtIsNull(userId);
+        List<ScanHistory> rows = scanHistoryRepository.findByUserIdAndRemovedAtIsNullOrderByScannedAtDesc(userId);
         int safe = 0;
         for (ScanHistory row : rows) {
             Set<String> detectedNames = detectedNamesFromHistoryField(row.getDetectedAllergens());
@@ -205,10 +211,22 @@ public class AllergenService {
         return stats;
     }
 
+    @Transactional
     public void clearHistory(Long userId) {
         if (userId == null) {
             throw new IllegalArgumentException("userId is required");
         }
-        scanHistoryRepository.deleteByUserId(userId);
+        scanHistoryRepository.softDeleteAllForUser(userId, LocalDateTime.now());
+    }
+
+    @Transactional
+    public void softDeleteHistoryEntry(Long userId, Long historyId) {
+        if (userId == null || historyId == null) {
+            throw new IllegalArgumentException("userId and historyId are required");
+        }
+        ScanHistory row = scanHistoryRepository.findByIdAndUserIdAndRemovedAtIsNull(historyId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("History entry not found"));
+        row.setRemovedAt(LocalDateTime.now());
+        scanHistoryRepository.save(row);
     }
 }

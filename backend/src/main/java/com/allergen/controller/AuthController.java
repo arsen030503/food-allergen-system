@@ -2,12 +2,14 @@ package com.allergen.controller;
 
 import com.allergen.dto.auth.AuthLoginResponse;
 import com.allergen.dto.auth.AuthRegisterResponse;
+import com.allergen.dto.auth.ChangePasswordRequest;
 import com.allergen.dto.auth.LoginRequest;
 import com.allergen.dto.auth.RegisterRequest;
 import com.allergen.dto.auth.UpdateAllergensRequest;
 import com.allergen.dto.auth.UpdateAvatarRequest;
 import com.allergen.dto.auth.UpdateNameRequest;
 import com.allergen.dto.auth.UpdateNameResponse;
+import com.allergen.dto.auth.UserProfileAssembler;
 import com.allergen.dto.auth.UserProfileResponse;
 import com.allergen.dto.common.ApiErrorResponse;
 import com.allergen.dto.common.MessageResponse;
@@ -16,6 +18,7 @@ import com.allergen.model.Role;
 import com.allergen.model.User;
 import com.allergen.repository.UserRepository;
 import com.allergen.security.JwtService;
+import com.allergen.service.AvatarImageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
@@ -33,14 +36,20 @@ public class AuthController {
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
+    private final AvatarImageService avatarImageService;
+    private final UserProfileAssembler userProfileAssembler;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    private static final int MAX_AVATAR_DATA_LENGTH = 8_000_000;
 
     @Autowired
-    public AuthController(UserRepository userRepository, JwtService jwtService) {
+    public AuthController(UserRepository userRepository,
+                          JwtService jwtService,
+                          AvatarImageService avatarImageService,
+                          UserProfileAssembler userProfileAssembler) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
+        this.avatarImageService = avatarImageService;
+        this.userProfileAssembler = userProfileAssembler;
     }
 
     private ResponseEntity<ApiErrorResponse> badRequest(String message) {
@@ -53,7 +62,7 @@ public class AuthController {
 
     private User getCurrentUser(HttpServletRequest request) {
         Long userId = jwtService.extractUserId(request);
-        return userRepository.findById(userId)
+        return userRepository.findByIdAndRemovedAtIsNull(userId)
                 .orElseThrow(() -> new UnauthorizedException("User not found for token"));
     }
 
@@ -65,18 +74,6 @@ public class AuthController {
         return user;
     }
 
-    private UserProfileResponse toUserProfileResponse(User user) {
-        UserProfileResponse response = new UserProfileResponse();
-        response.setUserId(user.getId());
-        response.setFullName(user.getFullName());
-        response.setEmail(user.getEmail());
-        response.setMyAllergens(user.getMyAllergens());
-        response.setCreatedAt(user.getCreatedAt());
-        response.setAvatarData(user.getAvatarData());
-        response.setRole(user.getRole().name());
-        return response;
-    }
-
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         String fullName = request.getFullName().trim();
@@ -84,7 +81,7 @@ public class AuthController {
         String password = request.getPassword();
         String normalizedEmail = email == null ? "" : email.toLowerCase(Locale.ROOT).trim();
 
-        if (userRepository.existsByEmail(normalizedEmail)) {
+        if (userRepository.existsByEmailAndRemovedAtIsNull(normalizedEmail)) {
             return badRequest("Email already registered");
         }
 
@@ -93,13 +90,8 @@ public class AuthController {
         user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(password));
         user.setMyAllergens("");
-        user.setCreatedAt(LocalDateTime.now().toString());
-        // If this is the first user, make them admin
-        if (userRepository.count() == 0) {
-            user.setRole(Role.ADMIN);
-        } else {
-            user.setRole(Role.USER);
-        }
+        user.setCreatedAt(LocalDateTime.now());
+        user.setRole(Role.USER);
         userRepository.save(user);
 
         AuthRegisterResponse response = new AuthRegisterResponse();
@@ -120,7 +112,7 @@ public class AuthController {
         String password = request.getPassword();
         String normalizedEmail = email == null ? "" : email.toLowerCase(Locale.ROOT).trim();
 
-        Optional<User> userOpt = userRepository.findByEmail(normalizedEmail);
+        Optional<User> userOpt = userRepository.findByEmailAndRemovedAtIsNull(normalizedEmail);
         if (userOpt.isEmpty()) {
             return statusError(401, "Invalid email or password");
         }
@@ -128,6 +120,9 @@ public class AuthController {
         User user = userOpt.get();
         if (!passwordEncoder.matches(password, user.getPassword())) {
             return statusError(401, "Invalid email or password");
+        }
+        if (user.getBlockedAt() != null) {
+            return statusError(403, "Account is blocked");
         }
 
         AuthLoginResponse response = new AuthLoginResponse();
@@ -150,10 +145,24 @@ public class AuthController {
                 .body(new MessageResponse("Logged out"));
     }
 
+    @PutMapping("/me/password")
+    public ResponseEntity<?> changePassword(
+            HttpServletRequest httpRequest,
+            @Valid @RequestBody ChangePasswordRequest body
+    ) {
+        User user = getCurrentUser(httpRequest);
+        if (!passwordEncoder.matches(body.getCurrentPassword(), user.getPassword())) {
+            return badRequest("Current password is incorrect");
+        }
+        user.setPassword(passwordEncoder.encode(body.getNewPassword()));
+        userRepository.save(user);
+        return ResponseEntity.ok(new MessageResponse("Password updated"));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> getCurrentUserProfile(HttpServletRequest request) {
         User user = getCurrentUser(request);
-        return ResponseEntity.ok(toUserProfileResponse(user));
+        return ResponseEntity.ok(userProfileAssembler.toResponse(user, true));
     }
 
     @GetMapping("/user/{id}")
@@ -161,7 +170,7 @@ public class AuthController {
             @PathVariable Long id,
             HttpServletRequest request) {
         User user = getAuthorizedPathUser(request, id);
-        return ResponseEntity.ok(toUserProfileResponse(user));
+        return ResponseEntity.ok(userProfileAssembler.toResponse(user, true));
     }
 
     @PutMapping("/me/avatar")
@@ -171,13 +180,20 @@ public class AuthController {
         User user = getCurrentUser(httpRequest);
         String avatarData = payload.getAvatarData();
 
-        if (avatarData != null && avatarData.length() > MAX_AVATAR_DATA_LENGTH) {
-            return badRequest("Avatar is too large");
+        try {
+            if (avatarData == null || avatarData.isBlank()) {
+                user.setAvatarFull(null);
+                user.setAvatarThumb(null);
+            } else {
+                AvatarImageService.ProcessedAvatar processed = avatarImageService.processFromClientPayload(avatarData);
+                user.setAvatarFull(processed.fullJpeg());
+                user.setAvatarThumb(processed.thumbJpeg());
+            }
+            userRepository.save(user);
+            return ResponseEntity.ok(new MessageResponse("Avatar updated"));
+        } catch (IllegalArgumentException e) {
+            return badRequest(e.getMessage());
         }
-
-        user.setAvatarData(avatarData == null || avatarData.isBlank() ? null : avatarData.trim());
-        userRepository.save(user);
-        return ResponseEntity.ok(new MessageResponse("Avatar updated"));
     }
 
     @PutMapping("/me/allergens")

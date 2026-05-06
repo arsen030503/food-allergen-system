@@ -1,61 +1,156 @@
 <template>
   <div class="admin-page">
-    <h1>Admin Panel</h1>
-    <div class="admin-content">
-      <div class="users-list">
-        <h2>All Users</h2>
-        <div v-if="loading" class="loading">Loading...</div>
-        <div v-else-if="error" class="error">{{ error }}</div>
-        <div v-else class="users-grid">
-          <div v-for="user in users" :key="user.userId" class="user-card">
-            <div class="user-info">
-              <h3>{{ user.fullName }}</h3>
-              <p>{{ user.email }}</p>
-              <p>Role: {{ user.role }}</p>
-              <p>Allergens: {{ user.myAllergens || 'None' }}</p>
-            </div>
-            <div class="user-actions">
-              <button @click="editUser(user)" class="btn btn-secondary">Edit</button>
-              <button @click="deleteUser(user.userId)" class="btn btn-danger">Delete</button>
-              <select @change="changeRole(user.userId, $event.target.value)" :value="user.role">
+    <header class="admin-hero">
+      <div>
+        <h1 class="admin-title">Admin</h1>
+        <p class="admin-sub">Manage users, access, and scan history</p>
+      </div>
+      <button type="button" class="btn-refresh" :disabled="loading" @click="fetchUsers">↻ Refresh</button>
+    </header>
+
+    <div v-if="loading" class="state-msg">Loading users…</div>
+    <div v-else-if="error" class="state-msg state-err">{{ error }}</div>
+
+    <div v-else class="user-table-wrap">
+      <table class="user-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Allergens</th>
+            <th class="th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="user in users" :key="user.userId" :class="{ rowBlocked: user.blocked }">
+            <td class="td-user">
+              <div class="user-cell">
+                <div class="avatar sm">
+                  <img v-if="avatarSrc(user)" :src="avatarSrc(user)" alt="" />
+                  <svg v-else viewBox="0 0 24 24"><use href="#ic-user" /></svg>
+                </div>
+                <div>
+                  <div class="name">{{ user.fullName }}</div>
+                  <div class="email">{{ user.email }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <select
+                class="role-select"
+                :value="user.role"
+                :disabled="user.userId === auth.user?.userId"
+                @change="changeRole(user.userId, $event.target.value)"
+              >
                 <option value="USER">USER</option>
                 <option value="ADMIN">ADMIN</option>
               </select>
-            </div>
-          </div>
-        </div>
-      </div>
+            </td>
+            <td>
+              <span v-if="user.blocked" class="pill pill-bad">Blocked</span>
+              <span v-else class="pill pill-ok">Active</span>
+            </td>
+            <td class="td-allergens"><span class="allergen-preview">{{ user.myAllergens || '—' }}</span></td>
+            <td class="td-actions">
+              <button type="button" class="btn-mini" @click="openEdit(user)">Edit</button>
+              <button type="button" class="btn-mini" @click="openHistory(user)">History</button>
+              <button type="button" class="btn-mini btn-warn" @click="resetPassword(user)">Reset password</button>
+              <button
+                v-if="user.role !== 'ADMIN'"
+                type="button"
+                class="btn-mini"
+                @click="toggleBlock(user)"
+              >
+                {{ user.blocked ? 'Unblock' : 'Block' }}
+              </button>
+              <button
+                type="button"
+                class="btn-mini btn-danger"
+                :disabled="user.userId === auth.user?.userId"
+                @click="removeUser(user.userId)"
+              >
+                Remove
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- Edit Modal -->
-    <div v-if="editingUser" class="modal-overlay" @click="closeEdit">
-      <div class="modal" @click.stop>
-        <h2>Edit User</h2>
-        <form @submit.prevent="saveUser">
-          <div class="form-group">
-            <label>Full Name:</label>
-            <input v-model="editForm.fullName" type="text" required />
-          </div>
-          <div class="form-group">
-            <label>Allergens:</label>
-            <textarea v-model="editForm.myAllergens"></textarea>
-          </div>
-          <div class="form-actions">
-            <button type="button" @click="closeEdit" class="btn btn-secondary">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save</button>
-          </div>
-        </form>
+    <!-- Edit user -->
+    <Teleport to="body">
+      <div v-if="editingUser" class="modal-overlay" @click.self="closeEdit">
+        <div class="modal panel">
+          <h2>Edit user</h2>
+          <form class="modal-form" @submit.prevent="saveUser">
+            <label class="field">
+              <span>Full name</span>
+              <input v-model="editForm.fullName" type="text" required />
+            </label>
+            <label class="field">
+              <span>Allergens (CSV)</span>
+              <textarea v-model="editForm.myAllergens" rows="4"></textarea>
+            </label>
+            <div class="modal-actions">
+              <button type="button" class="btn-secondary" @click="closeEdit">Cancel</button>
+              <button type="submit" class="btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </Teleport>
+
+    <!-- History drawer -->
+    <Teleport to="body">
+      <div v-if="historyUser" class="modal-overlay" @click.self="closeHistory">
+        <div class="modal panel wide">
+          <div class="hist-head">
+            <h2>Scan history — {{ historyUser.fullName }}</h2>
+            <div class="hist-actions">
+              <button type="button" class="btn-secondary btn-sm" @click="clearHist">Clear all</button>
+              <button type="button" class="btn-secondary btn-sm" @click="closeHistory">Close</button>
+            </div>
+          </div>
+          <div v-if="histLoading" class="state-msg">Loading…</div>
+          <ul v-else class="hist-list">
+            <li v-for="row in histRows" :key="row.id" class="hist-row">
+              <div>
+                <strong>{{ row.productName || 'Product' }}</strong>
+                <div class="hist-ing">{{ row.ingredients }}</div>
+              </div>
+              <button type="button" class="btn-mini btn-danger" @click="removeHistRow(row.id)">Delete</button>
+            </li>
+            <li v-if="!histRows.length" class="state-msg">No scans</li>
+          </ul>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Reset password result -->
+    <Teleport to="body">
+      <div v-if="resetPlain" class="modal-overlay" @click.self="resetPlain = ''">
+        <div class="modal panel">
+          <h2>Temporary password</h2>
+          <p class="hint">Copy now — it won’t be shown again.</p>
+          <div class="pwd-box">{{ resetPlain }}</div>
+          <button type="button" class="btn-primary" @click="copyPwd">Copy</button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useUiStore } from '../stores/ui'
 import * as authApi from '../api/auth'
 
 const auth = useAuthStore()
+const ui = useUiStore()
+const router = useRouter()
 
 const users = ref([])
 const loading = ref(false)
@@ -63,25 +158,36 @@ const error = ref('')
 const editingUser = ref(null)
 const editForm = ref({ fullName: '', myAllergens: '' })
 
+const historyUser = ref(null)
+const histRows = ref([])
+const histLoading = ref(false)
+
+const resetPlain = ref('')
+
+function avatarSrc(user) {
+  return user.avatarThumbData || user.avatarData || user.avatarFullData || ''
+}
+
 const fetchUsers = async () => {
   loading.value = true
   error.value = ''
   try {
     users.value = await authApi.getAllUsers()
   } catch (err) {
-    error.value = err.response?.data?.message || 'Failed to load users'
+    error.value = err.response?.data?.message || err.response?.data?.error || 'Failed to load users'
   } finally {
     loading.value = false
   }
 }
 
-const deleteUser = async (userId) => {
-  if (!confirm('Are you sure you want to delete this user?')) return
+const removeUser = async (userId) => {
+  if (!confirm('Soft-remove this user? They will not be able to sign in.')) return
   try {
     await authApi.deleteUser(userId)
+    ui.showToast('User removed')
     await fetchUsers()
-  } catch (err) {
-    alert('Failed to delete user')
+  } catch {
+    ui.showToast('Failed to remove user', 'danger')
   }
 }
 
@@ -89,17 +195,15 @@ const changeRole = async (userId, role) => {
   try {
     await authApi.updateUserRole(userId, role)
     await fetchUsers()
-  } catch (err) {
-    alert('Failed to update role')
+    ui.showToast('Role updated')
+  } catch {
+    ui.showToast('Failed to update role', 'danger')
   }
 }
 
-const editUser = (user) => {
+const openEdit = (user) => {
   editingUser.value = user
-  editForm.value = {
-    fullName: user.fullName,
-    myAllergens: user.myAllergens || ''
-  }
+  editForm.value = { fullName: user.fullName, myAllergens: user.myAllergens || '' }
 }
 
 const closeEdit = () => {
@@ -112,14 +216,85 @@ const saveUser = async () => {
     await authApi.updateUserAllergens(editingUser.value.userId, editForm.value.myAllergens)
     await fetchUsers()
     closeEdit()
-  } catch (err) {
-    alert('Failed to update user')
+    ui.showToast('Saved')
+  } catch {
+    ui.showToast('Save failed', 'danger')
   }
 }
 
-onMounted(() => {
+const resetPassword = async (user) => {
+  if (!confirm(`Generate a new password for ${user.email}?`)) return
+  try {
+    const res = await authApi.resetUserPassword(user.userId)
+    resetPlain.value = res.temporaryPassword
+    ui.showToast('Password reset')
+  } catch (e) {
+    ui.showToast(e.response?.data?.message || e.response?.data?.error || 'Reset failed', 'danger')
+  }
+}
+
+const copyPwd = async () => {
+  try {
+    await navigator.clipboard.writeText(resetPlain.value)
+    ui.showToast('Copied')
+  } catch {
+    ui.showToast('Copy failed', 'danger')
+  }
+}
+
+const toggleBlock = async (user) => {
+  try {
+    await authApi.setUserBlocked(user.userId, !user.blocked)
+    await fetchUsers()
+    ui.showToast(user.blocked ? 'Unblocked' : 'Blocked')
+  } catch (e) {
+    ui.showToast(e.response?.data?.message || e.response?.data?.error || 'Failed', 'danger')
+  }
+}
+
+const openHistory = async (user) => {
+  historyUser.value = user
+  histLoading.value = true
+  histRows.value = []
+  try {
+    histRows.value = await authApi.getUserHistory(user.userId)
+  } catch {
+    ui.showToast('Could not load history', 'danger')
+  } finally {
+    histLoading.value = false
+  }
+}
+
+const closeHistory = () => {
+  historyUser.value = null
+  histRows.value = []
+}
+
+const clearHist = async () => {
+  if (!historyUser.value || !confirm('Clear all scans for this user?')) return
+  try {
+    await authApi.clearUserHistory(historyUser.value.userId)
+    histRows.value = []
+    ui.showToast('History cleared')
+  } catch {
+    ui.showToast('Failed', 'danger')
+  }
+}
+
+const removeHistRow = async (id) => {
+  if (!historyUser.value || !confirm('Delete this scan?')) return
+  try {
+    await authApi.deleteUserHistoryEntry(historyUser.value.userId, id)
+    histRows.value = histRows.value.filter((r) => r.id !== id)
+    ui.showToast('Deleted')
+  } catch {
+    ui.showToast('Failed', 'danger')
+  }
+}
+
+onMounted(async () => {
   if (!auth.isAdmin) {
-    // Redirect if not admin
+    await router.push({ name: 'dashboard' })
     return
   }
   fetchUsers()
@@ -128,107 +303,305 @@ onMounted(() => {
 
 <style scoped>
 .admin-page {
-  padding: 20px;
+  padding: 32px 40px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: 'Inter', 'Geist', var(--font-sans), system-ui, sans-serif;
 }
-
-.admin-content {
-  margin-top: 20px;
-}
-
-.users-list h2 {
-  margin-bottom: 20px;
-}
-
-.users-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-}
-
-.user-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 15px;
-  background: white;
-}
-
-.user-info h3 {
-  margin: 0 0 10px 0;
-}
-
-.user-info p {
-  margin: 5px 0;
-}
-
-.user-actions {
-  margin-top: 15px;
+.admin-hero {
   display: flex;
-  gap: 10px;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 16px;
 }
-
-.btn {
-  padding: 8px 12px;
-  border: none;
-  border-radius: 4px;
+.admin-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+}
+.admin-sub {
+  margin: 0;
+  color: var(--text-300, #64748b);
+  font-size: 0.95rem;
+}
+.btn-refresh {
+  border-radius: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface-elevated, #fff);
+  padding: 10px 16px;
   cursor: pointer;
+  font-weight: 600;
 }
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
+.btn-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
-
-.btn-danger {
-  background: #dc3545;
-  color: white;
+.state-msg {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-300);
 }
-
-.btn-primary {
-  background: #007bff;
-  color: white;
+.state-err {
+  color: #b91c1c;
 }
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
+.user-table-wrap {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface-elevated, #fff);
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+}
+.user-table {
   width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.user-table th {
+  text-align: left;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  color: var(--text-300);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+.user-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border, #f1f5f9);
+  vertical-align: middle;
+}
+.rowBlocked {
+  opacity: 0.75;
+  background: #fef2f2;
+}
+.td-user {
+  min-width: 220px;
+}
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(145deg, #e0f2fe, #dbeafe);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
-.modal {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  width: 400px;
-  max-width: 90%;
-}
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-}
-
-.form-group input,
-.form-group textarea {
+.avatar.sm img {
   width: 100%;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  height: 100%;
+  object-fit: cover;
 }
-
-.form-actions {
+.avatar.sm svg {
+  width: 22px;
+  height: 22px;
+  opacity: 0.6;
+}
+.name {
+  font-weight: 600;
+  color: #0f172a;
+}
+.email {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+.role-select {
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+.pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.pill-ok {
+  background: #ecfdf5;
+  color: #047857;
+}
+.pill-bad {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.td-allergens {
+  max-width: 200px;
+}
+.allergen-preview {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #475569;
+  font-size: 0.8rem;
+}
+.th-actions {
+  width: 280px;
+}
+.td-actions {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.btn-mini {
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+.btn-mini:hover {
+  background: #f1f5f9;
+}
+.btn-warn {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+.btn-danger {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+.modal.panel {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15);
+}
+.modal.panel.wide {
+  max-width: 560px;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.modal h2 {
+  margin: 0 0 16px;
+  font-size: 1.15rem;
+}
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.field span {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #475569;
+}
+.field input,
+.field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  padding: 10px 12px;
+  font: inherit;
+}
+.modal-actions {
+  display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+.btn-primary {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+  padding: 10px 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-secondary {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 18px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.btn-sm {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+.hist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.hist-actions {
+  display: flex;
+  gap: 8px;
+}
+.hist-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.hist-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.85rem;
+}
+.hist-ing {
+  color: #64748b;
+  margin-top: 4px;
+  max-height: 48px;
+  overflow: hidden;
+}
+.pwd-box {
+  font-family: ui-monospace, monospace;
+  background: #f1f5f9;
+  padding: 14px;
+  border-radius: 10px;
+  margin: 12px 0;
+  word-break: break-all;
+  font-size: 0.9rem;
+}
+.hint {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0 0 8px;
+}
+@media (max-width: 900px) {
+  .user-table .td-actions {
+    flex-direction: column;
+  }
 }
 </style>

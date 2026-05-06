@@ -19,6 +19,11 @@ export async function logout() {
   await http.post('/auth/logout')
 }
 
+export async function changePassword(currentPassword, newPassword) {
+  const { data } = await http.put('/auth/me/password', { currentPassword, newPassword })
+  return data
+}
+
 export async function updateName(fullName) {
   const { data } = await http.put('/auth/me/name', { fullName })
   return data
@@ -56,5 +61,30 @@ export async function updateUserName(userId, fullName) {
 
 export async function updateUserRole(userId, role) {
   const { data } = await http.put(`/admin/users/${userId}/role`, { role })
+  return data
+}
+
+export async function resetUserPassword(userId) {
+  const { data } = await http.put(`/admin/users/${userId}/reset-password`)
+  return data
+}
+
+export async function setUserBlocked(userId, blocked) {
+  const { data } = await http.put(`/admin/users/${userId}/blocked`, { blocked })
+  return data
+}
+
+export async function getUserHistory(userId) {
+  const { data } = await http.get(`/admin/users/${userId}/history`)
+  return data
+}
+
+export async function clearUserHistory(userId) {
+  const { data } = await http.delete(`/admin/users/${userId}/history`)
+  return data
+}
+
+export async function deleteUserHistoryEntry(userId, historyId) {
+  const { data } = await http.delete(`/admin/users/${userId}/history/${historyId}`)
   return data
 }

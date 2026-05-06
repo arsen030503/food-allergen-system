@@ -90,6 +90,18 @@ class AllergenControllerTest {
         assertEquals("History cleared", response.getBody().getMessage());
         verify(allergenService).clearHistory(3L);
     }
+
+    @Test
+    void deleteHistoryEntryUsesTokenUserId() {
+        HttpServletRequest servletRequest = org.mockito.Mockito.mock(HttpServletRequest.class);
+        when(jwtService.extractUserId(servletRequest)).thenReturn(3L);
+
+        ResponseEntity<MessageResponse> response = allergenController.deleteHistoryEntry(9L, servletRequest);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("History entry removed", response.getBody().getMessage());
+        verify(allergenService).softDeleteHistoryEntry(3L, 9L);
+    }
 }
 
 

@@ -25,3 +25,8 @@ export async function clearHistory() {
   return data
 }
 
+export async function deleteHistoryEntry(id) {
+  const { data } = await http.delete(`/history/${id}`)
+  return data
+}
+

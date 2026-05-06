@@ -13,21 +13,49 @@ const ui = useUiStore()
 
 const sidebarCollapsed = ref(false)
 
+const sidebarExpanded = computed(() => !sidebarCollapsed.value)
+
 onMounted(async () => {
   try {
     await app.initialize()
     const saved = localStorage.getItem('sidebar-collapsed')
     if (saved !== null) {
-      sidebarCollapsed.value = JSON.parse(saved)
+      try {
+        sidebarCollapsed.value = JSON.parse(saved)
+      } catch {
+        /* ignore */
+      }
+    } else {
+      const pinned = localStorage.getItem('sidebar-pinned')
+      if (pinned !== null) {
+        try {
+          sidebarCollapsed.value = JSON.parse(pinned) !== true
+        } catch {
+          /* ignore */
+        }
+        localStorage.removeItem('sidebar-pinned')
+      }
     }
   } catch {
     ui.showToast('Failed to load dashboard data', 'danger')
   }
 })
 
-function toggleSidebar() {
-  sidebarCollapsed.value = !sidebarCollapsed.value
-  localStorage.setItem('sidebar-collapsed', JSON.stringify(sidebarCollapsed.value))
+function expandSidebar() {
+  sidebarCollapsed.value = false
+  localStorage.setItem('sidebar-collapsed', JSON.stringify(false))
+}
+
+function collapseSidebar() {
+  sidebarCollapsed.value = true
+  localStorage.setItem('sidebar-collapsed', JSON.stringify(true))
+}
+
+/** В узком режиме клик по «пустому» месту раскрывает (не по ссылкам, кнопкам, аватару) */
+function onSidebarBlankClick(e) {
+  if (!sidebarCollapsed.value) return
+  if (e.target.closest('a, button, label, input, .user-avatar-wrap')) return
+  expandSidebar()
 }
 
 const navItems = computed(() => {
@@ -46,7 +74,9 @@ const navItems = computed(() => {
 
 const userName = computed(() => auth.user?.fullName || 'User')
 const userEmail = computed(() => auth.user?.email || '...')
-const avatarData = computed(() => auth.user?.avatarData || '')
+const avatarData = computed(
+  () => auth.user?.avatarThumbData || auth.user?.avatarData || auth.user?.avatarFullData || ''
+)
 
 async function signOut() {
   await auth.signOut()
@@ -94,17 +124,28 @@ async function handleAvatarUpload(event) {
   <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
 
     <!-- SIDEBAR -->
-    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
-      <div class="sidebar-collapse-btn" @click="toggleSidebar" :title="sidebarCollapsed ? 'Expand' : 'Collapse'">
-        <svg viewBox="0 0 24 24" :class="{ rotated: !sidebarCollapsed }"><use href="#ic-chevron-left"/></svg>
-      </div>
+    <aside
+      class="sidebar"
+      :class="{ collapsed: sidebarCollapsed }"
+      @click="onSidebarBlankClick"
+    >
+      <button
+        v-if="sidebarExpanded"
+        type="button"
+        class="sidebar-close-btn"
+        aria-label="Свернуть меню"
+        title="Свернуть"
+        @click.stop="collapseSidebar"
+      >
+        <svg viewBox="0 0 24 24" class="sidebar-close-icon"><use href="#ic-close"/></svg>
+      </button>
 
       <div class="sidebar-brand">
         <div class="brand-logo">
           <svg width="28" height="28" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><use href="#ic-flask"/></svg>
         </div>
-        <div class="brand-name" v-if="!sidebarCollapsed">AllerScan</div>
-        <div class="brand-sub" v-if="!sidebarCollapsed">Allergen Detection System</div>
+        <div class="brand-name" v-if="sidebarExpanded">AllerScan</div>
+        <div class="brand-sub" v-if="sidebarExpanded">Allergen Detection System</div>
       </div>
 
       <div class="sidebar-user">
@@ -116,9 +157,9 @@ async function handleAvatarUpload(event) {
           <div class="avatar-overlay"><svg viewBox="0 0 24 24"><use href="#ic-camera"/></svg></div>
         </div>
         <input id="avatar-input" type="file" accept="image/*" style="display:none" @change="handleAvatarUpload" />
-        <div v-if="!sidebarCollapsed" class="user-name">{{ userName }}</div>
-        <div v-if="!sidebarCollapsed" class="user-email">{{ userEmail }}</div>
-        <div v-if="!sidebarCollapsed" class="user-stats">
+        <div v-if="sidebarExpanded" class="user-name">{{ userName }}</div>
+        <div v-if="sidebarExpanded" class="user-email">{{ userEmail }}</div>
+        <div v-if="sidebarExpanded" class="user-stats">
           <div class="user-stat">
             <span class="user-stat-n">{{ app.userAllergens.length }}</span>
             <span class="user-stat-l">Allergens</span>
@@ -142,16 +183,17 @@ async function handleAvatarUpload(event) {
           class="nav-item"
           :class="{ active: route.name === item.name }"
           :title="sidebarCollapsed ? item.label : ''"
+          :data-label="item.label"
         >
           <svg class="nav-icon" viewBox="0 0 24 24"><use :href="`#${item.icon}`"/></svg>
-          <span v-if="!sidebarCollapsed">{{ item.label }}</span>
+          <span v-if="sidebarExpanded">{{ item.label }}</span>
         </RouterLink>
       </nav>
 
       <div class="sidebar-footer">
         <button class="nav-item nav-item-danger" @click="signOut" :title="sidebarCollapsed ? 'Sign Out' : ''">
           <svg class="nav-icon" viewBox="0 0 24 24"><use href="#ic-logout"/></svg>
-          <span v-if="!sidebarCollapsed">Sign Out</span>
+          <span v-if="sidebarExpanded">Sign Out</span>
         </button>
       </div>
     </aside>

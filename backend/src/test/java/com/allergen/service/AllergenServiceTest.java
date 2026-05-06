@@ -14,12 +14,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AllergenServiceTest {
@@ -52,7 +56,7 @@ class AllergenServiceTest {
         milk.setDescription("Milk and dairy products");
         milk.setTriggerIngredients("milk,cream,whey");
 
-        when(userRepository.findById(7L)).thenReturn(Optional.of(userWithProfile(7L, "Milk,Soy")));
+        when(userRepository.findByIdAndRemovedAtIsNull(7L)).thenReturn(Optional.of(userWithProfile(7L, "Milk,Soy")));
 
         when(allergenRepository.findAll()).thenReturn(List.of(milk));
 
@@ -89,7 +93,7 @@ class AllergenServiceTest {
         milk.setDescription("Milk and dairy products");
         milk.setTriggerIngredients("milk");
 
-        when(userRepository.findById(99L)).thenReturn(Optional.of(userWithProfile(99L, "")));
+        when(userRepository.findByIdAndRemovedAtIsNull(99L)).thenReturn(Optional.of(userWithProfile(99L, "")));
 
         when(allergenRepository.findAll()).thenReturn(List.of(milk));
 
@@ -115,7 +119,7 @@ class AllergenServiceTest {
         milk.setDescription("x");
         milk.setTriggerIngredients("milk");
 
-        when(userRepository.findById(3L)).thenReturn(Optional.of(userWithProfile(3L, "Peanuts")));
+        when(userRepository.findByIdAndRemovedAtIsNull(3L)).thenReturn(Optional.of(userWithProfile(3L, "Peanuts")));
 
         when(allergenRepository.findAll()).thenReturn(List.of(milk));
 
@@ -138,18 +142,17 @@ class AllergenServiceTest {
 
     @Test
     void getHistoryUsesUserScopedRepositoryCall() {
-        when(userRepository.findById(11L)).thenReturn(Optional.of(userWithProfile(11L, "Milk")));
-        when(scanHistoryRepository.findTop10ByUserIdOrderByScannedAtDesc(11L)).thenReturn(List.of());
+        when(userRepository.findByIdAndRemovedAtIsNull(11L)).thenReturn(Optional.of(userWithProfile(11L, "Milk")));
+        when(scanHistoryRepository.findTop10ByUserIdAndRemovedAtIsNullOrderByScannedAtDesc(11L)).thenReturn(List.of());
 
         assertNotNull(allergenService.getHistoryForUser(11L));
-        verify(scanHistoryRepository).findTop10ByUserIdOrderByScannedAtDesc(11L);
-        verify(scanHistoryRepository, never()).findTop10ByOrderByScannedAtDesc();
+        verify(scanHistoryRepository).findTop10ByUserIdAndRemovedAtIsNullOrderByScannedAtDesc(11L);
     }
 
     @Test
-    void clearHistoryUsesUserScopedRepositoryDelete() {
+    void clearHistorySoftDeletesRowsForUser() {
         allergenService.clearHistory(11L);
 
-        verify(scanHistoryRepository).deleteByUserId(11L);
+        verify(scanHistoryRepository).softDeleteAllForUser(eq(11L), any(LocalDateTime.class));
     }
 }

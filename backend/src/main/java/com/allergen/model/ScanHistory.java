@@ -20,10 +20,15 @@ public class ScanHistory {
     @Column
     private LocalDateTime scannedAt;
 
+    @Column(nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column
+    private LocalDateTime removedAt;
+
     @Column
     private int allergenCount;
 
-    // FIX: привязка истории к пользователю
     @Column
     private Long userId;
 
@@ -32,10 +37,11 @@ public class ScanHistory {
 
     @PrePersist
     public void prePersist() {
-        scannedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        scannedAt = now;
+        createdAt = now;
     }
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -47,6 +53,12 @@ public class ScanHistory {
 
     public LocalDateTime getScannedAt() { return scannedAt; }
     public void setScannedAt(LocalDateTime scannedAt) { this.scannedAt = scannedAt; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getRemovedAt() { return removedAt; }
+    public void setRemovedAt(LocalDateTime removedAt) { this.removedAt = removedAt; }
 
     public int getAllergenCount() { return allergenCount; }
     public void setAllergenCount(int allergenCount) { this.allergenCount = allergenCount; }

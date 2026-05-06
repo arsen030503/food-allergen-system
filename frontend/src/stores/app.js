@@ -64,7 +64,20 @@ export const useAppStore = defineStore('app', {
     async clearHistory() {
       await allergenApi.clearHistory()
       this.scanHistory = []
-      await this.hydrateStats()
+      try {
+        await this.hydrateStats()
+      } catch {
+        /* stats failure should not look like clear failed */
+      }
+    },
+    async deleteHistoryEntry(id) {
+      await allergenApi.deleteHistoryEntry(id)
+      await this.hydrateHistory()
+      try {
+        await this.hydrateStats()
+      } catch {
+        /* ignore */
+      }
     },
     async toggleAllergen(name, enabled) {
       if (enabled && !this.userAllergens.includes(name)) {
@@ -92,9 +105,10 @@ export const useAppStore = defineStore('app', {
     },
     async updateAvatar(avatarData) {
       await authApi.updateAvatar(avatarData)
+      const fresh = await authApi.getMe()
       const auth = useAuthStore()
       if (auth.user) {
-        auth.user = { ...auth.user, avatarData }
+        auth.user = fresh
       }
     },
     getEmoji(name) {

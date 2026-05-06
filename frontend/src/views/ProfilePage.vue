@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useAppStore } from '../stores/app'
 import { useUiStore } from '../stores/ui'
+import * as authApi from '../api/auth'
 
 const auth = useAuthStore()
 const app = useAppStore()
@@ -11,6 +12,10 @@ const ui = useUiStore()
 const editingName = ref(false)
 const fullNameInput = ref(auth.user?.fullName || '')
 
+const avatarDisplay = computed(
+  () => auth.user?.avatarFullData || auth.user?.avatarData || auth.user?.avatarThumbData || ''
+)
+
 const uniqueAllergens = computed(() => {
   const names = app.allAllergens.map((item) => item.name)
   return [...new Set(names)]
@@ -18,11 +23,15 @@ const uniqueAllergens = computed(() => {
 
 const memberSince = computed(() => {
   const raw = auth.user?.createdAt
-  if (!raw) return 'April 2026'
+  if (!raw) return '—'
   const date = new Date(raw)
   if (Number.isNaN(date.getTime())) return raw
-  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric', day: 'numeric' })
 })
+
+const pwdCurrent = ref('')
+const pwdNew = ref('')
+const pwdNew2 = ref('')
 
 function startEditName() {
   fullNameInput.value = auth.user?.fullName || ''
@@ -69,13 +78,36 @@ async function handleProfileAvatarUpload(event) {
 
 async function saveName() {
   const value = fullNameInput.value.trim()
-  if (!value) { ui.showToast('Name cannot be empty', 'danger'); return }
+  if (!value) {
+    ui.showToast('Name cannot be empty', 'danger')
+    return
+  }
   try {
     await app.updateName(value)
     editingName.value = false
     ui.showToast('Name updated successfully')
   } catch {
     ui.showToast('Failed to update name', 'danger')
+  }
+}
+
+async function changePassword() {
+  if (pwdNew.value !== pwdNew2.value) {
+    ui.showToast('New passwords do not match', 'danger')
+    return
+  }
+  if (pwdNew.value.length < 8) {
+    ui.showToast('New password must be at least 8 characters', 'danger')
+    return
+  }
+  try {
+    await authApi.changePassword(pwdCurrent.value, pwdNew.value)
+    pwdCurrent.value = ''
+    pwdNew.value = ''
+    pwdNew2.value = ''
+    ui.showToast('Password updated')
+  } catch (e) {
+    ui.showToast(e.response?.data?.message || e.response?.data?.error || 'Failed', 'danger')
   }
 }
 
@@ -90,299 +122,408 @@ async function toggle(name, enabled) {
 </script>
 
 <template>
-  <div class="profile-wrapper">
-    <div class="profile-page">
-      <div class="profile-header">
-        <h1 class="page-title">My Allergen Profile</h1>
-        <p class="profile-header-sub">Manage your account and personal allergen sensitivities</p>
-      </div>
-      <div class="profile-content-grid">
-        <div class="profile-section profile-account">
-          <div class="profile-section-title">Account Information</div>
-          <div class="profile-section-sub">Your profile details and preferences</div>
-          <div class="profile-avatar-section">
-            <div class="profile-avatar-big" title="Click to change photo" @click="triggerProfileAvatarUpload">
-              <div class="profile-avatar-img">
-                <img v-if="auth.user?.avatarData" :src="auth.user.avatarData" alt="avatar"/>
-                <svg v-else width="48" height="48" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><use href="#ic-user"/></svg>
-              </div>
-              <div class="pa-overlay">
-                <svg viewBox="0 0 24 24"><use href="#ic-camera"/></svg>
-                <span>Change</span>
-              </div>
-            </div>
-            <input id="profile-avatar-input" type="file" accept="image/*" style="display:none" @change="handleProfileAvatarUpload"/>
-            <div class="profile-avatar-meta">
-              <div class="profile-avatar-name">{{ auth.user?.fullName || '—' }}</div>
-              <div class="profile-avatar-email">{{ auth.user?.email || '—' }}</div>
-            </div>
-          </div>
-          <div class="account-grid">
-            <div class="account-field">
-              <div class="account-field-label">Full Name</div>
-              <div class="account-field-value">
-                <input v-model="fullNameInput" :readonly="!editingName" :style="editingName ? 'border-bottom:1.5px solid var(--green-500)' : ''"/>
-                <button v-if="!editingName" class="edit-btn" @click="startEditName">Edit</button>
-                <button v-if="editingName" class="save-btn" style="display:inline-flex" @click="saveName">Save</button>
-                <button v-if="editingName" class="edit-btn" @click="cancelEditName">Cancel</button>
-              </div>
-            </div>
-            <div class="account-field">
-              <div class="account-field-label">Email</div>
-              <div class="account-field-value">{{ auth.user?.email || '—' }}</div>
-            </div>
-            <div class="account-field">
-              <div class="account-field-label">Member Since</div>
-              <div class="account-field-value">{{ memberSince }}</div>
-            </div>
-            <div class="account-field">
-              <div class="account-field-label">Plan</div>
-              <div class="account-field-value">🟢 Free Plan</div>
-            </div>
-          </div>
+  <div class="profile-shell">
+    <div class="profile-inner">
+      <header class="ph">
+        <div>
+          <p class="ph-kicker">Account</p>
+          <h1 class="ph-title">Profile</h1>
+          <p class="ph-desc">Photo, security, and your allergen list — in one place.</p>
         </div>
-        <div class="profile-section profile-allergens">
-          <div class="profile-section-title">My Allergens</div>
-          <div class="profile-section-sub">Select allergens you're sensitive to — results will only show these</div>
-          <div class="allergens-list">
-            <div v-for="name in uniqueAllergens" :key="name" class="allergen-toggle-row" :class="{ 'active-allergen': app.userAllergens.includes(name) }">
-              <span class="toggle-emoji"><svg v-if="app.getEmoji(name).startsWith('<svg')" v-html="app.getEmoji(name)" style="width:32px;height:32px;vertical-align:middle"/> <template v-else>{{ app.getEmoji(name) }}</template></span>
-              <div class="toggle-info">
-                <div class="toggle-name" :class="{ 'active-allergen': app.userAllergens.includes(name) }">{{ name }}</div>
-                <div class="toggle-triggers">{{ (app.allAllergens.find((item) => item.name === name)?.triggerIngredients || '').split(',').slice(0, 3).join(', ') }}...</div>
+      </header>
+
+      <div class="profile-grid">
+        <section class="card card-accent">
+          <h2 class="card-title">Photo & identity</h2>
+          <div class="hero-avatar" @click="triggerProfileAvatarUpload">
+            <img v-if="avatarDisplay" :src="avatarDisplay" alt="Profile" />
+            <div v-else class="hero-avatar-placeholder">
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                <use href="#ic-user" />
+              </svg>
+            </div>
+            <div class="hero-avatar-badge">
+              <svg width="18" height="18" viewBox="0 0 24 24"><use href="#ic-camera" /></svg>
+              Update
+            </div>
+          </div>
+          <input id="profile-avatar-input" type="file" accept="image/*" class="sr-only" @change="handleProfileAvatarUpload" />
+
+          <div class="identity-block">
+            <div class="identity-name">{{ auth.user?.fullName || '—' }}</div>
+            <div class="identity-email">{{ auth.user?.email || '—' }}</div>
+            <div class="identity-meta">
+              <span class="meta-pill">Member since {{ memberSince }}</span>
+              <span v-if="auth.user?.role === 'ADMIN'" class="meta-pill meta-admin">Admin</span>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label class="label">Display name</label>
+            <div class="name-row">
+              <input v-model="fullNameInput" class="input" :readonly="!editingName" />
+              <template v-if="!editingName">
+                <button type="button" class="btn-soft" @click="startEditName">Edit</button>
+              </template>
+              <template v-else>
+                <button type="button" class="btn-primary-inline" @click="saveName">Save</button>
+                <button type="button" class="btn-soft" @click="cancelEditName">Cancel</button>
+              </template>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 class="card-title">Security</h2>
+          <p class="card-sub">Change your password any time.</p>
+          <div class="stack">
+            <label class="label">Current password</label>
+            <input v-model="pwdCurrent" type="password" class="input" autocomplete="current-password" />
+            <label class="label">New password</label>
+            <input v-model="pwdNew" type="password" class="input" autocomplete="new-password" />
+            <label class="label">Confirm new password</label>
+            <input v-model="pwdNew2" type="password" class="input" autocomplete="new-password" />
+            <button type="button" class="btn-primary-wide" @click="changePassword">Update password</button>
+          </div>
+        </section>
+
+        <section class="card card-wide">
+          <div class="card-head">
+            <h2 class="card-title">My allergens</h2>
+            <p class="card-sub">Toggle what applies to you — scans will highlight these matches.</p>
+          </div>
+          <div class="allergen-grid">
+            <div
+              v-for="name in uniqueAllergens"
+              :key="name"
+              class="allergen-card"
+              :class="{ 'is-on': app.userAllergens.includes(name) }"
+            >
+              <div class="ac-emoji">
+                <svg
+                  v-if="app.getEmoji(name).startsWith('<svg')"
+                  v-html="app.getEmoji(name)"
+                  style="width:28px;height:28px;vertical-align:middle"
+                />
+                <template v-else>{{ app.getEmoji(name) }}</template>
               </div>
-              <label class="toggle-switch">
-                <input :checked="app.userAllergens.includes(name)" type="checkbox" @change="toggle(name, $event.target.checked)"/>
-                <span class="toggle-track"></span>
+              <div class="ac-body">
+                <div class="ac-name">{{ name }}</div>
+                <div class="ac-hint">
+                  {{ (app.allAllergens.find((item) => item.name === name)?.triggerIngredients || '').split(',').slice(0, 2).join(', ') }}
+                </div>
+              </div>
+              <label class="switch">
+                <input :checked="app.userAllergens.includes(name)" type="checkbox" @change="toggle(name, $event.target.checked)" />
+                <span class="switch-ui" />
               </label>
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.profile-wrapper {
+.profile-shell {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
   min-height: 100vh;
-  background: var(--surface);
-  font-family: 'Inter', 'Geist', var(--font-sans), Arial, sans-serif;
+  background: linear-gradient(180deg, var(--surface, #f8fafc) 0%, #eef2f7 100%);
 }
-.profile-page {
-  padding: 48px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-  align-content: start;
+.profile-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  font-family: 'Inter', 'Geist', var(--font-sans), system-ui, sans-serif;
 }
-.profile-header {
-  margin-bottom: 0;
+.ph {
+  margin-bottom: 28px;
 }
-.profile-header-sub {
-  color: var(--text-300);
-  font-size: 14px;
+.ph-kicker {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #64748b;
+  margin: 0 0 6px;
 }
-.profile-content-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 32px;
-  align-items: stretch;
+.ph-title {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 8px;
+  color: #0f172a;
 }
-.profile-section {
-  background: rgba(255,255,255,0.97);
-  border-radius: 18px;
-  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.03);
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
+.ph-desc {
+  margin: 0;
+  color: #64748b;
+  font-size: 1rem;
+  max-width: 480px;
+  line-height: 1.5;
 }
-.profile-account {
-  min-width: 0;
-}
-.profile-allergens {
-  min-width: 0;
-}
-.account-grid {
+.profile-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin-top: 24px;
-  width: 100%;
+  gap: 22px;
+  align-items: start;
 }
-.account-field {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 18px 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 90px;
-  box-sizing: border-box;
+.card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 26px;
+  box-shadow: 0 4px 32px rgba(15, 23, 42, 0.07);
+  border: 1px solid rgba(15, 23, 42, 0.06);
 }
-.account-field-label {
-  font-size: 13px;
-  color: #6b7280;
-  margin-bottom: 6px;
-  font-weight: 500;
+.card-accent {
+  background: linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%);
 }
-.account-field-value {
-  font-size: 16px;
-  color: #22223b;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.card-wide {
+  grid-column: 1 / -1;
 }
-.edit-btn, .save-btn {
-  margin-left: 8px;
-  font-size: 13px;
-  padding: 4px 12px;
-  border-radius: 8px;
-  border: none;
-  background: var(--green-100);
-  color: var(--green-700);
-  cursor: pointer;
-  font-weight: 500;
-  transition: background .18s;
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: #0f172a;
 }
-.edit-btn:hover, .save-btn:hover {
-  background: var(--green-200);
+.card-sub {
+  margin: 0 0 18px;
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.45;
 }
-.profile-avatar-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.card-head {
   margin-bottom: 18px;
 }
-.profile-avatar-big {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: var(--green-100);
+.hero-avatar {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 28px;
+  overflow: hidden;
+  cursor: pointer;
+  margin: 0 auto 20px;
+  box-shadow: 0 12px 40px rgba(16, 185, 129, 0.25);
+}
+.hero-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hero-avatar-placeholder {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  cursor: pointer;
-  margin-bottom: 10px;
-  overflow: hidden;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #065f46;
 }
-.profile-avatar-img img, .profile-avatar-img svg {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-}
-.pa-overlay {
+.hero-avatar-badge {
   position: absolute;
-  bottom: 0;
   left: 0;
-  width: 100%;
-  background: rgba(0,0,0,0.32);
+  right: 0;
+  bottom: 0;
+  padding: 8px;
+  background: rgba(15, 23, 42, 0.72);
   color: #fff;
-  font-size: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 4px 0;
-  border-bottom-left-radius: 50%;
-  border-bottom-right-radius: 50%;
 }
-.profile-avatar-meta {
+.identity-block {
   text-align: center;
+  margin-bottom: 22px;
 }
-.profile-avatar-name {
-  font-weight: 600;
-  font-size: 16px;
-}
-.profile-avatar-email {
-  font-size: 13px;
-  color: #6b7280;
-}
-.profile-section-title {
-  font-size: 18px;
+.identity-name {
+  font-size: 1.25rem;
   font-weight: 700;
-  margin-bottom: 4px;
-  color: #22223b;
+  color: #0f172a;
 }
-.profile-section-sub {
-  font-size: 13px;
-  color: #6b7280;
-  margin-bottom: 18px;
+.identity-email {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-top: 4px;
 }
-.allergens-list {
-  width: 100%;
+.identity-meta {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: flex-start;
-}
-.allergen-toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 14px 18px;
-  min-height: 56px;
-  width: 100%;
-  box-sizing: border-box;
-  transition: background .18s;
-}
-.allergen-toggle-row.active-allergen {
-  background: var(--green-50);
-}
-.toggle-emoji {
-  font-size: 32px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: center;
+  margin-top: 12px;
 }
-.toggle-info {
+.meta-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+}
+.meta-admin {
+  background: #ecfdf5;
+  color: #047857;
+}
+.field-row {
+  margin-top: 8px;
+}
+.label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+.name-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.input {
   flex: 1;
+  min-width: 160px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 10px 14px;
+  font: inherit;
+  background: #fff;
+}
+.input:focus {
+  outline: none;
+  border-color: #34d399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+}
+.btn-soft {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: #334155;
+}
+.btn-primary-inline {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+}
+.stack {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 10px;
 }
-.toggle-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #22223b;
+.btn-primary-wide {
+  margin-top: 8px;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  color: #fff;
 }
-.toggle-triggers {
-  color: #9ca3af;
-  font-size: 13px;
+.allergen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.allergen-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.allergen-card.is-on {
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.12);
+}
+.ac-emoji {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+.ac-body {
+  flex: 1;
+  min-width: 0;
+}
+.ac-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+.ac-hint {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin-top: 2px;
 }
-.toggle-switch {
-  display: flex;
-  align-items: center;
-  gap: 0;
+.switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
 }
-.toggle-switch input[type="checkbox"] {
-  accent-color: var(--green-500);
-  width: 18px;
-  height: 18px;
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
-.toggle-track {
-  display: none;
+.switch-ui {
+  position: absolute;
+  inset: 0;
+  background: #cbd5e1;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.switch-ui::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+.switch input:checked + .switch-ui {
+  background: #10b981;
+}
+.switch input:checked + .switch-ui::after {
+  transform: translateX(18px);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
 @media (max-width: 900px) {
-  .profile-page {
-    padding: 20px 8px;
-  }
-  .profile-content-grid {
+  .profile-grid {
     grid-template-columns: 1fr;
-    gap: 18px;
   }
 }
 </style>

@@ -12,18 +12,17 @@
        --font-sans:'DM Sans',sans-serif;--font-mono:'DM Mono',monospace;
      }
     body{font-family:var(--font-sans);background:var(--surface);color:var(--text-900);display:flex;min-height:100vh;overflow-x:hidden}
-     .sidebar{width:var(--sidebar-w);min-height:100vh;background:var(--green-800);display:flex;flex-direction:column;padding:32px 0;position:fixed;top:0;left:0;z-index:100;transition:width .3s ease}
-     .sidebar.collapsed{width:var(--sidebar-w-collapsed);padding:24px 0}
-     .sidebar-collapse-btn{position:absolute;top:24px;right:12px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.1);border:none;border-radius:6px;cursor:pointer;transition:background .2s;color:#fff}
-     .sidebar-collapse-btn:hover{background:rgba(255,255,255,.15)}
-     .sidebar-collapse-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .3s}
-     .sidebar-collapse-btn svg.rotated{transform:scaleX(-1)}
-     .sidebar-brand{padding:0 24px 32px;border-bottom:1px solid rgba(255,255,255,.08);transition:padding .3s}
+     .sidebar{width:var(--sidebar-w);height:100vh;max-height:100vh;min-height:100vh;background:var(--green-800);display:flex;flex-direction:column;padding:32px 0;position:fixed;top:0;left:0;z-index:100;transition:width .3s ease;overflow:hidden}
+     .sidebar.collapsed{width:var(--sidebar-w-collapsed);padding:24px 0;cursor:pointer}
+     .sidebar-close-btn{position:absolute;top:24px;right:12px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:none;border-radius:8px;cursor:pointer;transition:background .2s;color:#fff;z-index:2;flex-shrink:0;padding:0}
+     .sidebar-close-btn:hover{background:rgba(255,255,255,.2)}
+     .sidebar-close-icon{width:14px;height:14px;stroke:currentColor;fill:none;pointer-events:none}
+     .sidebar-brand{padding:0 24px 32px;border-bottom:1px solid rgba(255,255,255,.08);transition:padding .3s;flex-shrink:0}
      .sidebar.collapsed .sidebar-brand{padding:0 12px 32px;text-align:center}
     .brand-logo{width:52px;height:52px;background:linear-gradient(135deg,var(--green-400),var(--green-600));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:12px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
     .brand-name{color:#fff;font-family:var(--font-serif);font-size:22px;font-weight:700;line-height:1}
     .brand-sub{color:rgba(255,255,255,.5);font-size:11px;letter-spacing:.08em;margin-top:4px}
-     .sidebar-user{padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.08);transition:padding .3s}
+     .sidebar-user{padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.08);transition:padding .3s;flex-shrink:0}
      .sidebar.collapsed .sidebar-user{padding:20px 12px;text-align:center}
 
     /* ── AVATAR ── */
@@ -44,7 +43,9 @@
     .user-stat:hover{background:rgba(255,255,255,.1)}
     .user-stat-n{color:#fff;font-weight:700;font-size:16px;display:block}
     .user-stat-l{color:rgba(255,255,255,.4);font-size:9px;letter-spacing:.08em;text-transform:uppercase}
-     .sidebar-nav{padding:16px 12px;flex:1;transition:padding .3s}
+     .sidebar-nav{padding:16px 12px;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;transition:padding .3s;scrollbar-color:rgba(255,255,255,.25) transparent;scrollbar-width:thin}
+     .sidebar-nav::-webkit-scrollbar{width:6px}
+     .sidebar-nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:6px}
      .sidebar.collapsed .sidebar-nav{padding:16px 6px}
      .nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--radius-sm);color:rgba(255,255,255,.6);font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;position:relative}
      .sidebar.collapsed .nav-item{justify-content:center;padding:11px 8px;gap:0}
@@ -53,7 +54,7 @@
     .nav-item:hover{background:rgba(255,255,255,.08);color:#fff}
     .nav-item.active{background:rgba(255,255,255,.12);color:#fff}
     .nav-icon{width:20px;height:20px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-     .sidebar-footer{padding:16px 24px}
+     .sidebar-footer{padding:16px 24px;flex-shrink:0;border-top:1px solid rgba(255,255,255,.06)}
      .sidebar.collapsed .sidebar-footer{padding:16px 12px}
     .nav-item-danger{color:rgba(255,100,100,.7)!important}
     .nav-item-danger:hover{background:rgba(255,80,80,.08)!important;color:#ff8080!important}

@@ -82,6 +82,15 @@ public class AllergenController {
         return ResponseEntity.ok(new MessageResponse("History cleared"));
     }
 
+    @DeleteMapping("/history/{id}")
+    public ResponseEntity<MessageResponse> deleteHistoryEntry(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest) {
+        Long userId = jwtService.extractUserId(httpRequest);
+        allergenService.softDeleteHistoryEntry(userId, id);
+        return ResponseEntity.ok(new MessageResponse("History entry removed"));
+    }
+
     // GET /api/health - check if server is running
     @GetMapping("/health")
     public ResponseEntity<HealthResponse> health() {
