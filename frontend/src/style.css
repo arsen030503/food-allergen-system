@@ -1,0 +1,8 @@
+/**
+ * Vue entry shim: global theme and layout live in /public/css/app.css (loaded from index.html).
+ * Keep this file minimal to avoid cascade conflicts (legacy Vite template styles removed).
+ */
+#app {
+  min-height: 100vh;
+  width: 100%;
+}
